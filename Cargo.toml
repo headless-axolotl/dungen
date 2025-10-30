@@ -1,0 +1,12 @@
+[package]
+name = "dungen"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# command line argument parser
+# clap = { ... }
+
+# visualisations during development
+# raylib = { ... }
+

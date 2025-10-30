@@ -1,0 +1,10 @@
+
+# Report Week 1
+- Chose a topic (generating dungeons) and researched algorithms (0.75h).
+- Created the repository and initialized several of the required documentation
+files.
+
+Queries:
+- I'd like to know whether the libraries I am planning to use are allowed. They
+can be found in the file Cargo.toml under the section **dependencies**.
+
