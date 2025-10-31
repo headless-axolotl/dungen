@@ -47,27 +47,27 @@ pub fn generate_doorways<R: Rng>(rectangle: &Rectangle, rng: &mut R) -> ([Vector
     if doorway_mask & (1 << EAST) != 0 {
         doorways[doorway_count] = corner + vec2(
             rectangle.width,
-            rng.random_range(DOORWAY_OFFSET..=rectangle.height as usize - DOORWAY_OFFSET) as f32
+            rng.random_range(DOORWAY_OFFSET..=rectangle.height as usize - DOORWAY_OFFSET - 1) as f32
         );
         doorway_count += 1;
     }
     if doorway_mask & (1 << NORTH) != 0 {
         doorways[doorway_count] = corner + vec2(
-            rng.random_range(DOORWAY_OFFSET..=rectangle.width as usize - DOORWAY_OFFSET) as f32,
-            0.0
+            rng.random_range(DOORWAY_OFFSET..=rectangle.width as usize - DOORWAY_OFFSET - 1) as f32,
+            -1.0
         );
         doorway_count += 1;
     }
     if doorway_mask & (1 << WEST) != 0 {
-        doorways[doorway_count] = vec2(
-            0.0,
-            rng.random_range(DOORWAY_OFFSET..=rectangle.height as usize - DOORWAY_OFFSET) as f32
+        doorways[doorway_count] = corner + vec2(
+            -1.0,
+            rng.random_range(DOORWAY_OFFSET..=rectangle.height as usize - DOORWAY_OFFSET - 1) as f32
         );
         doorway_count += 1;
     }
     if doorway_mask & (1 << SOUTH) != 0 {
-        doorways[doorway_count] = vec2(
-            rng.random_range(DOORWAY_OFFSET..=rectangle.width as usize - DOORWAY_OFFSET) as f32,
+        doorways[doorway_count] = corner + vec2(
+            rng.random_range(DOORWAY_OFFSET..=rectangle.width as usize - DOORWAY_OFFSET - 1) as f32,
             rectangle.height,
         );
         doorway_count += 1;
@@ -86,8 +86,8 @@ pub fn generate_rooms<R: Rng>(
 
     let target_room_count =
         target_room_count.unwrap_or((grid_dimensions.x * grid_dimensions.y) as usize);
-    let x_range = 0..=(grid_dimensions.x as usize - MIN_ROOM_DIMENSION - MIN_PADDING);
-    let y_range = 0..=(grid_dimensions.y as usize - MIN_ROOM_DIMENSION - MIN_PADDING);
+    let x_range = MIN_PADDING..=(grid_dimensions.x as usize - MIN_ROOM_DIMENSION - MIN_PADDING);
+    let y_range = MIN_PADDING..=(grid_dimensions.y as usize - MIN_ROOM_DIMENSION - MIN_PADDING);
 
     let mut room_count = 0;
     let mut fail_count = 0;
