@@ -7,6 +7,7 @@ files. (0.75h)
 - Wrote a procedure which checks whether a point is in the circumcircle of a
 given triangle. (0.75h)
 - Wrote the room generation procedures. (0.75h)
+- Wrote the triangulation procedure and visualisation. (3h)
 
 Queries:
 - I'd like to know whether the libraries I am planning to use are allowed. They
