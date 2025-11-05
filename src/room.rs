@@ -1,8 +1,7 @@
-use crate::{Configuration, vec::vec2};
+use crate::{Configuration, rng::Rng, vec::vec2};
 
 use std::ops::RangeInclusive;
 
-use rand::Rng;
 use raylib::math::{Rectangle, Vector2};
 
 const EAST: usize = 0;
@@ -58,8 +57,7 @@ pub fn generate_doorways<R: Rng>(
 
     if doorway_mask & (1 << EAST) != 0 {
         doorways.push(Doorway {
-            room_index,
-            position: corner
+            room_index, position: corner
                 + vec2(
                     room.bounds.width,
                     rng.random_range(vertical_range.clone()) as f32,
@@ -68,20 +66,17 @@ pub fn generate_doorways<R: Rng>(
     }
     if doorway_mask & (1 << NORTH) != 0 {
         doorways.push(Doorway {
-            room_index,
-            position: corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0),
+            room_index, position: corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0),
         });
     }
     if doorway_mask & (1 << WEST) != 0 {
         doorways.push(Doorway {
-            room_index,
-            position: corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32),
+            room_index, position: corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32),
         });
     }
     if doorway_mask & (1 << SOUTH) != 0 {
         doorways.push(Doorway {
-            room_index,
-            position: corner
+            room_index, position: corner
                 + vec2(
                     rng.random_range(horizontal_range.clone()) as f32,
                     room.bounds.height,
@@ -91,7 +86,10 @@ pub fn generate_doorways<R: Rng>(
 }
 
 /// Randomly picks a position and then valid dimensions to place
-/// a room.
+/// a room. Attempts to place a given amount of rooms but aborts
+/// the operation if there are a number of failed attempts specified
+/// in the configuration.
+///
 pub fn generate_rooms<R: Rng>(
     configuration: &Configuration,
     grid_dimensions: Vector2,
@@ -107,8 +105,8 @@ pub fn generate_rooms<R: Rng>(
     let min_room_dimension = configuration.min_room_dimension;
     let max_room_dimension = configuration.max_room_dimension;
 
-    let target_room_count =
-        target_room_count.unwrap_or((grid_dimensions.x * grid_dimensions.y) as usize);
+    let target_room_count = target_room_count
+        .unwrap_or((grid_dimensions.x * grid_dimensions.y) as usize);
     let x_range = min_padding..=(grid_dimensions.x as usize - min_room_dimension - min_padding);
     let y_range = min_padding..=(grid_dimensions.y as usize - min_room_dimension - min_padding);
 
@@ -124,9 +122,7 @@ pub fn generate_rooms<R: Rng>(
     let mut rectangle: Rectangle;
 
     'outer: while room_count < target_room_count {
-        if fail_count >= configuration.max_fail_count {
-            break;
-        }
+        if fail_count > configuration.max_fail_count { break; }
 
         x = rng.random_range(x_range.clone());
         y = rng.random_range(y_range.clone());
@@ -165,4 +161,169 @@ pub fn generate_rooms<R: Rng>(
     }
 
     result
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::{mock::*, vec::vec2u};
+    use raylib::math::Rectangle;
+
+    #[test]
+    fn overlap() {
+        let rect_a = Rectangle::new(0.0, 0.0, 5.0, 5.0);
+        let rect_b = Rectangle::new(8.0, 3.0, 5.0, 5.0);
+        let rect_c = Rectangle::new(7.0, 5.0, 5.0, 5.0);
+
+        assert!(
+            !overlap_with_padding(3, &rect_a, &rect_b),
+            "Rectangles should not overlap with padding."
+        );
+        assert!(
+            !overlap_with_padding(3, &rect_b, &rect_a),
+            "Rectangles should not overlap with padding."
+        );
+        assert!(
+            overlap_with_padding(3, &rect_a, &rect_c),
+            "Rectangles should overlap with padding."
+        );
+        assert!(
+            overlap_with_padding(3, &rect_c, &rect_a),
+            "Rectangles should overlap with padding."
+        );
+        assert!(
+            !overlap_with_padding(2, &rect_a, &rect_c),
+            "Rectangles should not overlap with padding."
+        );
+    }
+
+    fn doorway_generation_variant(mut rng: impl Rng, doorway_count: usize) {
+        let doorway_offset = 2;
+        let mut doorways: Vec<Doorway> = vec![];
+        let rectangle = Rectangle::new(1.0, 1.0, 5.0, 5.0);
+        let outline = Rectangle::new(
+            rectangle.x - 1.0,
+            rectangle.y - 1.0,
+            rectangle.width + 2.0,
+            rectangle.height + 2.0,
+        );
+        let corners = [
+            vec2(outline.x, outline.y),
+            vec2(outline.x, outline.y + outline.height - 1.0),
+            vec2(outline.x + outline.width - 1.0, outline.y),
+            vec2(
+                outline.x + outline.width - 1.0,
+                outline.y + outline.height - 1.0,
+            ),
+        ];
+
+        generate_doorways(
+            doorway_offset,
+            0,
+            &Room { bounds: rectangle },
+            &mut doorways,
+            &mut rng,
+        );
+
+        assert_eq!(
+            doorways.len(),
+            doorway_count,
+            "There should be {} doorways.",
+            doorway_count
+        );
+        for doorway in doorways {
+            assert!(
+                outline.check_collision_point_rec(doorway.position),
+                "Doorway must be within the outline of the room."
+            );
+            assert!(
+                !rectangle.check_collision_point_rec(doorway.position),
+                "Doorway must be outside the room."
+            );
+            for corner in &corners {
+                let manhatan =
+                    (corner.x - doorway.position.x).abs() + (corner.y - doorway.position.y).abs();
+                assert!(
+                    manhatan as usize > doorway_offset,
+                    "Doorway should be farther from the corner of the outline of the room."
+                )
+            }
+        }
+    }
+
+    #[test]
+    fn doorway_generation() {
+        doorway_generation_variant(MockMinRng, 1);
+        doorway_generation_variant(MockMaxRng, 4);
+    }
+
+    #[test]
+    fn room_generation_max_rng() {
+        let configuration = Configuration::new(5, 20, 3, 2, 20);
+        let map_dimension = configuration.min_padding * 2 + configuration.min_room_dimension;
+        let result = generate_rooms(
+            &configuration,
+            vec2u(map_dimension, map_dimension),
+            Some(1),
+            &mut MockMaxRng,
+        );
+        assert_eq!(result.rooms.len(), 1, "There should be exactly 1 room.");
+        assert!(
+            result.rooms[0].bounds.width as usize == configuration.min_room_dimension
+                && result.rooms[0].bounds.height as usize == configuration.min_room_dimension,
+            "The room dimensions are not correct."
+        );
+    }
+
+    fn room_generation_failed_second_room() {
+        let configuration = Configuration::new(5, 20, 3, 2, 3);
+        let map_dimension = configuration.min_padding * 3 + 10;
+        let map_dimensions = vec2u(map_dimension, map_dimension);
+
+        // x, y, width, height, doorway mask
+        let mut numbers: Vec<usize> = vec![
+            0, 0, 5, 5, 0,
+        ];
+        numbers.append(&mut [6, 6, 5, 5].repeat(configuration.max_fail_count + 1));
+        let mut mock_rng = MockRng::new(numbers);
+
+        let result = generate_rooms(
+            &configuration,
+            map_dimensions,
+            None,
+            &mut mock_rng,
+        );
+
+        assert_eq!(result.rooms.len(), 1, "There should be exactly 1 room.");
+    }
+
+    fn room_generation_two_rooms_one_failure() {
+        let configuration = Configuration::new(5, 20, 3, 2, 3);
+        let map_dimension = configuration.min_padding * 3 + 10;
+        let map_dimensions = vec2u(map_dimension, map_dimension);
+        // x, y, width, height, doorway mask
+        let numbers: Vec<usize> = vec![
+            0, 0, 5, 5, 0,
+            6, 6, 5, 5,
+            9, 9, 5, 5, 0,
+        ];
+        let mut mock_rng = MockRng::new(numbers);
+
+        let result = generate_rooms(
+            &configuration,
+            map_dimensions,
+            Some(2),
+            &mut mock_rng,
+        );
+
+        assert_eq!(result.rooms.len(), 2, "There should be exactly 2 rooms.");
+    }
+
+    #[test]
+    fn room_generation_specific_rng() {
+        // In these tests we do not care about generating doorways, so the mock_rng chooses a
+        // number outside the range of possible doorway masks.
+        room_generation_failed_second_room();
+        room_generation_two_rooms_one_failure();
+    }
 }

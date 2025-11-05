@@ -1,8 +1,12 @@
 //! 2D Dungeon generator.
 
+pub mod rng;
 pub mod room;
 pub mod triangulation;
 pub mod vec;
+
+#[cfg(test)]
+pub mod mock;
 
 use std::marker::PhantomData;
 
@@ -16,6 +20,7 @@ pub struct Configuration {
 }
 
 impl Configuration {
+    #[cfg(not(tarpaulin_include))]
     pub fn new(
         min_room_dimension: usize,
         max_room_dimension: usize,
@@ -42,7 +47,6 @@ impl Configuration {
             "The doorway offset must be greater than 0 because \
             the doorways should not be in the corners of the rooms."
         );
-        assert!(max_fail_count > 0);
 
         Self {
             min_room_dimension,

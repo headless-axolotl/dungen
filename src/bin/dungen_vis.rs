@@ -13,6 +13,7 @@ const CONTROLS: &str = "\
 [ESC] - exit
 ";
 
+#[cfg(not(tarpaulin_include))]
 fn main() {
     let mut rng = rand::rng();
     let grid_dimensions = vec2i(100, 100);
