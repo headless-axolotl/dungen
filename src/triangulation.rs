@@ -1,4 +1,4 @@
-use crate::room::Room;
+use crate::room::{Doorway, Room, Rooms};
 use crate::vec::{point_in_circumcircle, vec2};
 
 use std::collections::HashSet;
@@ -7,14 +7,9 @@ use raylib::math::Vector2;
 
 #[derive(Debug)]
 pub struct Triangulation {
-    pub points: Vec<Point>,
+    pub rooms: Vec<Room>,
+    pub doorways: Vec<Doorway>,
     pub edges: Vec<(usize, usize)>,
-}
-
-#[derive(Debug)]
-pub struct Point {
-    pub room_index: usize,
-    pub position: Vector2,
 }
 
 /// Makes edges with consistent point ordering.
@@ -24,35 +19,26 @@ fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
 
 /// Employs the Bowyer-Watson algorithm to create a Delaynay triangulation
 /// between the doorways of the rooms.
-pub fn triangulate(grid_dimensions: Vector2, rooms: &[Room]) -> Triangulation {
-    let mut points: Vec<Point> = vec![];
+pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> Triangulation {
+    let Rooms { rooms, mut doorways } = rooms;
 
-    for (room_index, room) in rooms.iter().enumerate() {
-        for i in 0..room.doorway_count {
-            points.push(Point {
-                room_index,
-                position: room.doorways[i],
-            });
-        }
-    }
-
-    // The last three points belong to the super_triangle.
+    // The last three doorways belong to the super_triangle.
     let none_room_index = rooms.len();
     // Create a right triangle, which covers the whole grid.
-    points.push(Point {
+    doorways.push(Doorway {
         room_index: none_room_index,
         position: vec2(-1.0, -1.0),
     });
-    points.push(Point {
+    doorways.push(Doorway {
         room_index: none_room_index,
         position: vec2(-1.0, 2.0 * grid_dimensions.y + 1.0),
     });
-    points.push(Point {
+    doorways.push(Doorway {
         room_index: none_room_index,
         position: vec2(2.0 * grid_dimensions.x + 1.0, -1.0),
     });
 
-    let super_triangle_first_point_index = points.len() - 3;
+    let super_triangle_first_point_index = doorways.len() - 3;
 
     let mut triangles: Vec<(usize, usize, usize)> = vec![(
         super_triangle_first_point_index,
@@ -63,15 +49,15 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: &[Room]) -> Triangulation {
     let mut bad_triangles: Vec<usize> = vec![];
     let mut polygon: HashSet<(usize, usize)> = HashSet::new();
 
-    // Skip the last three points since those are part of the super triangle.
-    for (point_index, point) in points[..points.len()-3].iter().enumerate() {
+    // Skip the last three doorways since those are part of the super triangle.
+    for (point_index, point) in doorways[..doorways.len()-3].iter().enumerate() {
         bad_triangles.clear();
         for (triangle_index, triangle) in triangles.iter().enumerate() {
             let point_is_in_circumcircle = point_in_circumcircle(
                 point.position,
-                points[triangle.0].position,
-                points[triangle.1].position,
-                points[triangle.2].position,
+                doorways[triangle.0].position,
+                doorways[triangle.1].position,
+                doorways[triangle.2].position,
             );
 
             if point_is_in_circumcircle {
@@ -113,7 +99,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: &[Room]) -> Triangulation {
         }
     }
 
-    // Remove triangles which have points from
+    // Remove triangles which have doorways from
     // the original super triangle.
     let mut triangle_index: usize = 0;
     while triangle_index < triangles.len() {
@@ -128,10 +114,10 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: &[Room]) -> Triangulation {
         triangle_index += 1;
     }
 
-    // Remove the points of the super-triangle.
-    points.pop();
-    points.pop();
-    points.pop();
+    // Remove the doorways of the super-triangle.
+    doorways.pop();
+    doorways.pop();
+    doorways.pop();
 
     // In subsequent steps it is better to have a list
     // of edges instead of the triangles.
@@ -143,7 +129,8 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: &[Room]) -> Triangulation {
     }
 
     Triangulation {
-        points,
+        rooms,
+        doorways,
         edges: polygon.drain().collect(),
     }
 }

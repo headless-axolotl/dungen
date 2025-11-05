@@ -10,15 +10,27 @@ const NORTH: usize = 1;
 const WEST: usize = 2;
 const SOUTH: usize = 3;
 
-/// TODO: doc
+/// Structure representing a rectangular room in the grid.
 #[derive(Debug)]
 pub struct Room {
-    pub rectangle: Rectangle,
-    pub doorways: [Vector2; 4],
-    pub doorway_count: usize,
+    pub bounds: Rectangle,
 }
 
-/// TODO: doc
+#[derive(Debug)]
+pub struct Doorway {
+    pub room_index: usize,
+    pub position: Vector2,
+}
+
+#[derive(Debug)]
+pub struct Rooms {
+    pub rooms: Vec<Room>,
+    pub doorways: Vec<Doorway>,
+}
+
+/// Guarantees that there is at least min_padding cells
+/// distance between the two rectangles. We need only extend
+/// the rectangles down and to the right.
 pub fn overlap_with_padding(min_padding: usize, a: &Rectangle, b: &Rectangle) -> bool {
     let mut padded_a = *a;
     padded_a.width += min_padding as f32;
@@ -29,59 +41,67 @@ pub fn overlap_with_padding(min_padding: usize, a: &Rectangle, b: &Rectangle) ->
     padded_a.check_collision_recs(&padded_b)
 }
 
-/// TODO: doc
+/// Generates doorways given a room.
 pub fn generate_doorways<R: Rng>(
     doorway_offset: usize,
-    rectangle: &Rectangle,
+    room_index: usize,
+    room: &Room,
+    doorways: &mut Vec<Doorway>,
     rng: &mut R,
-) -> ([Vector2; 4], usize) {
-    let mut doorways: [Vector2; 4] = [Vector2::zero(); 4];
+) {
     // Generate a random number representing which doorways exist.
     let doorway_mask = rng.random_range(1..=15);
-    let corner = vec2(rectangle.x, rectangle.y);
-    let mut doorway_count = 0;
+    let corner = vec2(room.bounds.x, room.bounds.y);
 
-    let vertical_range = doorway_offset..=rectangle.height as usize - doorway_offset - 1;
-    let horizontal_range = doorway_offset..=rectangle.width as usize - doorway_offset - 1;
+    let vertical_range = doorway_offset..=room.bounds.height as usize - doorway_offset - 1;
+    let horizontal_range = doorway_offset..=room.bounds.width as usize - doorway_offset - 1;
 
     if doorway_mask & (1 << EAST) != 0 {
-        doorways[doorway_count] = corner
-            + vec2(
-                rectangle.width,
-                rng.random_range(vertical_range.clone()) as f32,
-            );
-        doorway_count += 1;
+        doorways.push(Doorway {
+            room_index,
+            position: corner
+                + vec2(
+                    room.bounds.width,
+                    rng.random_range(vertical_range.clone()) as f32,
+                ),
+        });
     }
     if doorway_mask & (1 << NORTH) != 0 {
-        doorways[doorway_count] =
-            corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0);
-        doorway_count += 1;
+        doorways.push(Doorway {
+            room_index,
+            position: corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0),
+        });
     }
     if doorway_mask & (1 << WEST) != 0 {
-        doorways[doorway_count] =
-            corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32);
-        doorway_count += 1;
+        doorways.push(Doorway {
+            room_index,
+            position: corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32),
+        });
     }
     if doorway_mask & (1 << SOUTH) != 0 {
-        doorways[doorway_count] = corner
-            + vec2(
-                rng.random_range(horizontal_range.clone()) as f32,
-                rectangle.height,
-            );
-        doorway_count += 1;
+        doorways.push(Doorway {
+            room_index,
+            position: corner
+                + vec2(
+                    rng.random_range(horizontal_range.clone()) as f32,
+                    room.bounds.height,
+                ),
+        });
     }
-
-    (doorways, doorway_count)
 }
 
-/// TODO: doc
+/// Randomly picks a position and then valid dimensions to place
+/// a room.
 pub fn generate_rooms<R: Rng>(
     configuration: &Configuration,
     grid_dimensions: Vector2,
     target_room_count: Option<usize>,
     rng: &mut R,
-) -> Vec<Room> {
-    let mut result: Vec<Room> = vec![];
+) -> Rooms {
+    let mut result: Rooms = Rooms {
+        rooms: vec![],
+        doorways: vec![],
+    };
 
     let min_padding = configuration.min_padding;
     let min_room_dimension = configuration.min_room_dimension;
@@ -121,23 +141,27 @@ pub fn generate_rooms<R: Rng>(
 
         rectangle = Rectangle::new(x as f32, y as f32, width as f32, height as f32);
 
-        for previous_room in &result {
-            if overlap_with_padding(min_padding, &previous_room.rectangle, &rectangle) {
+        for previous_room in &result.rooms {
+            if overlap_with_padding(min_padding, &previous_room.bounds, &rectangle) {
                 fail_count += 1;
                 continue 'outer;
             }
         }
 
-        let (doorways, doorway_count) =
-            generate_doorways(configuration.doorway_offset, &rectangle, rng);
+        let room_index = result.rooms.len();
+        let room = Room { bounds: rectangle };
+
+        generate_doorways(
+            configuration.doorway_offset,
+            room_index,
+            &room,
+            &mut result.doorways,
+            rng,
+        );
 
         fail_count = 0;
         room_count += 1;
-        result.push(Room {
-            rectangle,
-            doorways,
-            doorway_count,
-        });
+        result.rooms.push(room);
     }
 
     result

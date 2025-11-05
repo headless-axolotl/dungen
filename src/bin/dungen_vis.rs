@@ -18,7 +18,7 @@ fn main() {
     let grid_dimensions = vec2i(100, 100);
     let configuration = Configuration::new(5, 20, 3, 2, 20);
     let mut rooms = generate_rooms(&configuration, grid_dimensions, Some(15), &mut rng);
-    let mut triangulation = triangulate(grid_dimensions, &rooms);
+    let mut triangulation = triangulate(grid_dimensions, rooms);
 
     let (mut rl, thread) = raylib::init().size(640, 640).title("Dungeon").build();
 
@@ -30,7 +30,7 @@ fn main() {
     while !rl.window_should_close() {
         if rl.is_key_pressed(KeyboardKey::KEY_R) {
             rooms = generate_rooms(&configuration, grid_dimensions, Some(15), &mut rng);
-            triangulation = triangulate(grid_dimensions, &rooms);
+            triangulation = triangulate(grid_dimensions, rooms);
         }
 
         // Delta time.
@@ -74,23 +74,24 @@ fn main() {
 
         draw_handle.draw_rectangle_v(offset, grid_dimensions * scale, Color::GRAY);
 
-        for room in &rooms {
-            let room_corner = offset + vec2(room.rectangle.x, room.rectangle.y) * scale;
-            let room_dimensions = vec2(room.rectangle.width, room.rectangle.height) * scale;
+        for room in &triangulation.rooms {
+            let room_corner = offset + vec2(room.bounds.x, room.bounds.y) * scale;
+            let room_dimensions = vec2(room.bounds.width, room.bounds.height) * scale;
             draw_handle.draw_rectangle_v(room_corner, room_dimensions, Color::PURPLE);
-            for i in 0..room.doorway_count {
-                draw_handle.draw_rectangle_v(
-                    offset + room.doorways[i] * scale,
-                    vec2(scale, scale),
-                    Color::BLUE,
-                );
-            }
+        }
+
+        for doorway in &triangulation.doorways {
+            draw_handle.draw_rectangle_v(
+                offset + doorway.position * scale,
+                vec2(scale, scale),
+                Color::BLUE,
+            );
         }
 
         for edge in &triangulation.edges {
             draw_handle.draw_line_v(
-                offset + triangulation.points[edge.0].position * scale + scale / 2.0,
-                offset + triangulation.points[edge.1].position * scale + scale / 2.0,
+                offset + triangulation.doorways[edge.0].position * scale + scale / 2.0,
+                offset + triangulation.doorways[edge.1].position * scale + scale / 2.0,
                 Color::LIME,
             );
         }

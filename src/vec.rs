@@ -1,18 +1,27 @@
 use raylib::math::Vector2;
 
-/// TODO: doc
+/// Converts a point to an array grid index.
+/// Grids will be stored in a single-dimension array
+/// for the purposes of less allocation.
 pub fn to_index(v: Vector2, grid_width: usize) -> usize {
     debug_assert!(v.x >= 0.0);
+    debug_assert!(v.x < grid_width as f32);
     debug_assert!(v.y >= 0.0);
     grid_width * v.y as usize + v.x as usize
 }
 
 // Shorthands for creating vectors.
 pub fn vec2i(x: i32, y: i32) -> Vector2 {
-    Vector2 { x: x as f32, y: y as f32 }
+    Vector2 {
+        x: x as f32,
+        y: y as f32,
+    }
 }
 pub fn vec2u(x: usize, y: usize) -> Vector2 {
-    Vector2 { x: x as f32, y: y as f32 }
+    Vector2 {
+        x: x as f32,
+        y: y as f32,
+    }
 }
 pub fn vec2(x: f32, y: f32) -> Vector2 {
     Vector2 { x, y }
@@ -58,8 +67,39 @@ mod test {
         );
 
         assert!(
-            point_in_circumcircle(vec2i(700, 1000), vec2i(600, 400), vec2i(-600, 1200), vec2i(0, 100)),
+            point_in_circumcircle(
+                vec2i(700, 1000),
+                vec2i(600, 400),
+                vec2i(-600, 1200),
+                vec2i(0, 100)
+            ),
             "Point should have been in the circumcircle."
+        );
+    }
+
+    #[test]
+    pub fn index() {
+        let grid_width = 5;
+        let vector = vec2i(2, 3);
+        let index_in_grid = 17;
+        assert_eq!(
+            to_index(vector, grid_width),
+            index_in_grid,
+            "Index in grid does not match with vector."
+        );
+
+        let col = 3;
+        let row = 2;
+        let index_in_grid = to_index(vec2u(row, col), grid_width);
+        assert_eq!(
+            index_in_grid % grid_width,
+            row,
+            "Index in grid does not convert back to row correctly."
+        );
+        assert_eq!(
+            index_in_grid / grid_width,
+            col,
+            "Index in grid does not convert back to column correctly."
         );
     }
 }
