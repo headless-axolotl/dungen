@@ -89,7 +89,6 @@ pub fn generate_doorways<R: Rng>(
 /// a room. Attempts to place a given amount of rooms but aborts
 /// the operation if there are a number of failed attempts specified
 /// in the configuration.
-///
 pub fn generate_rooms<R: Rng>(
     configuration: &Configuration,
     grid_dimensions: Vector2,

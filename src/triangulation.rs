@@ -20,7 +20,10 @@ fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
 /// Employs the Bowyer-Watson algorithm to create a Delaynay triangulation
 /// between the doorways of the rooms.
 pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> Triangulation {
-    let Rooms { rooms, mut doorways } = rooms;
+    let Rooms {
+        rooms,
+        mut doorways,
+    } = rooms;
 
     // The last three doorways belong to the super_triangle.
     let none_room_index = rooms.len();
@@ -50,7 +53,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> Triangulation {
     let mut polygon: HashSet<(usize, usize)> = HashSet::new();
 
     // Skip the last three doorways since those are part of the super triangle.
-    for (point_index, point) in doorways[..doorways.len()-3].iter().enumerate() {
+    for (point_index, point) in doorways[..doorways.len() - 3].iter().enumerate() {
         bad_triangles.clear();
         for (triangle_index, triangle) in triangles.iter().enumerate() {
             let point_is_in_circumcircle = point_in_circumcircle(
@@ -132,5 +135,42 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> Triangulation {
         rooms,
         doorways,
         edges: polygon.drain().collect(),
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::vec::vec2u;
+
+    /// Shorthand for creating a doorway.
+    fn point(x: usize, y: usize) -> Doorway {
+        Doorway {
+            room_index: 0,
+            position: vec2u(x, y),
+        }
+    }
+
+    #[test]
+    fn triangulation() {
+        // For this test we do not need the room boundaries.
+        let grid_dimensions = vec2u(100, 100);
+        let rooms = Rooms {
+            rooms: vec![],
+            doorways: vec![point(1, 1), point(2, 1), point(1, 2)],
+        };
+
+        let result = triangulate(grid_dimensions, rooms);
+        assert_eq!(
+            result.edges.len(),
+            3,
+            "There should be exactly 1 triangle and exactly 3 edges."
+        );
+        assert!(
+            result.edges.contains(&(0, 1))
+                && result.edges.contains(&(1, 2))
+                && result.edges.contains(&(0, 2)),
+            "The result does not contain all the correct edges."
+        );
     }
 }
