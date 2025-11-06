@@ -1,6 +1,6 @@
-use crate::binary_heap::Heap;
 use crate::Configuration;
-use crate::a_star;
+use crate::a_star::a_star;
+use crate::binary_heap::Heap;
 use crate::room::RoomGraph;
 use crate::vec::to_index;
 
@@ -94,7 +94,7 @@ impl From<&str> for Grid {
 
 /// Places a corridor in the grid. Surrounds the corridor with marker tiles
 /// so that the search algorithm knows to avoid creating 2x2 corridor tile blocks.
-/// When there is a turn in the corridor, places a blockin tile again to prevent
+/// When there is a turn in the corridor, places a blocking tile again to prevent
 /// the pathfinding algorithm from creating 2x2 corridor tile blocks.
 fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
     use Tile::*;
@@ -110,29 +110,22 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
     }
 
     // The first and the last tiles in the path are doorways.
-    let mut previous = path[0];
     for &current in &path[1..] {
+        if !matches!(tiles[current], Corridor) {
+            place_corridor_neighbor(current + 1, tiles);
+            place_corridor_neighbor(current - 1, tiles);
+            place_corridor_neighbor(current + width, tiles);
+            place_corridor_neighbor(current - width, tiles);
+        }
+
         if !matches!(tiles[current], Doorway) {
             tiles[current] = Corridor;
         }
-
-        let (neighbor_a, neighbor_b) = if a_star::diff(previous, current) == 1 {
-            // We moved horizontally, therefore, the corridor neighbors should be placed
-            // above and below the previous tile.
-            (previous + width, previous - width)
-        } else {
-            (previous + 1, previous - 1)
-        };
-
-        place_corridor_neighbor(neighbor_a, tiles);
-        place_corridor_neighbor(neighbor_b, tiles);
-
-        previous = current;
     }
 }
 
 pub fn make_grid(
-    _configuration: &Configuration,
+    configuration: &Configuration,
     grid_dimensions: Vector2,
     room_graph: &RoomGraph,
 ) -> Grid {
@@ -183,14 +176,17 @@ pub fn make_grid(
     let mut g_scores: Vec<usize> = vec![];
     let mut parent: Vec<usize> = vec![];
     let mut path: Vec<usize> = vec![];
-    
+
     // Place doorways (which replace blocking tiles around the rooms) and create corridors.
     for edge in &room_graph.edges {
-        tiles[to_index(room_graph.doorways[edge.0].position, grid_width)] = Doorway;
-        tiles[to_index(room_graph.doorways[edge.1].position, grid_width)] = Doorway;
-        a_star::a_star(
-            to_index(room_graph.doorways[edge.0].position, grid_width),
-            to_index(room_graph.doorways[edge.1].position, grid_width),
+        let position_a = to_index(room_graph.doorways[edge.0].position, grid_width);
+        let position_b = to_index(room_graph.doorways[edge.1].position, grid_width);
+        tiles[position_a] = Doorway;
+        tiles[position_b] = Doorway;
+        a_star(
+            configuration,
+            position_a,
+            position_b,
             grid_width,
             &tiles,
             &mut open_set,

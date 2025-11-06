@@ -1,12 +1,6 @@
+use crate::Configuration;
 use crate::binary_heap::Heap;
 use crate::grid::Tile;
-
-const CORRIDOR_COST: usize = 1;
-const STANDARD_COST: usize = 3;
-const _: () = assert!(
-    CORRIDOR_COST <= STANDARD_COST,
-    "The cost through a corridor should be less than or equal to the standard cost."
-);
 
 /// Absolute difference between two unsigned integers
 pub fn diff(a: usize, b: usize) -> usize {
@@ -22,12 +16,12 @@ fn manhattan(width: usize, a: usize, b: usize) -> usize {
 /// guarantee that the corridors follow a specific shape. Since this procedure will be called
 /// multiple times, there is no need to allocate the needed structures more than once.
 ///
-/// The heuristic used is the manhatan distance from this cell to the end multiplied by the
-/// corridor cost (which should be less than the standard cost). We want the algorithm to prefer to
-/// go through corridors instead of carving new ones. The heuristic is admissible and consistent as
-/// we assume the best case of traveling only through corridors till the end.
+/// The heuristic used is the manhatan distance from this cell to the end multiplied by the minimum
+/// cost (with respect of all types of cost). The heuristic is admissible and consistent as we
+/// assume the best case of traveling only through the cheapest possible path.
 #[allow(clippy::too_many_arguments)]
 pub fn a_star(
+    configuration: &Configuration,
     start: usize,
     end: usize,
     width: usize,
@@ -38,6 +32,11 @@ pub fn a_star(
     path: &mut Vec<usize>,
 ) {
     use Tile::*;
+
+    let corridor_cost = configuration.corridor_cost;
+    let straight_cost = configuration.straight_cost;
+    let standard_cost = configuration.standard_cost;
+    let min_cost = corridor_cost.min(straight_cost).min(standard_cost);
 
     // Initialize the structures.
     open_set.clear();
@@ -51,7 +50,7 @@ pub fn a_star(
     path.clear();
 
     g_scores[start] = 0;
-    open_set.insert(manhattan(width, start, end) * CORRIDOR_COST, 0);
+    open_set.insert(manhattan(width, start, end) * min_cost, start);
 
     while let Some((_, mut current)) = open_set.extract_min() {
         if current == end {
@@ -84,16 +83,18 @@ pub fn a_star(
             }
 
             let cost = if matches!(tiles[neighbor], Corridor) {
-                CORRIDOR_COST
+                corridor_cost
+            } else if diff(current, parent[current]) == diff(neighbor, current) {
+                straight_cost
             } else {
-                STANDARD_COST
+                standard_cost
             };
 
             let tentative_g_score = g_scores[current] + cost;
             if tentative_g_score < g_scores[neighbor] {
                 parent[neighbor] = current;
                 g_scores[neighbor] = tentative_g_score;
-                let f_score = tentative_g_score + manhattan(width, neighbor, end) * CORRIDOR_COST;
+                let f_score = tentative_g_score + manhattan(width, neighbor, end) * min_cost;
                 open_set.insert(f_score, neighbor);
             }
         }

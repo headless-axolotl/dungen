@@ -23,11 +23,16 @@ pub struct Configuration {
     /// What proportion of edges on average should be reintroduced as corridors i.e. (0) out of
     /// every (1).
     pub reintroduced_corridor_density: (usize, usize),
+    // The costs which of different types of corridors.
+    pub corridor_cost: usize,
+    pub straight_cost: usize,
+    pub standard_cost: usize,
     phantom: PhantomData<()>,
 }
 
 impl Configuration {
     #[cfg(not(tarpaulin_include))]
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         min_room_dimension: usize,
         max_room_dimension: usize,
@@ -35,6 +40,9 @@ impl Configuration {
         doorway_offset: usize,
         max_fail_count: usize,
         reintroduced_corridor_density: (usize, usize),
+        corridor_cost: usize,
+        straight_cost: usize,
+        standard_cost: usize,
     ) -> Self {
         assert!(
             min_room_dimension >= 5,
@@ -59,6 +67,10 @@ impl Configuration {
             reintroduced_corridor_density.0 <= reintroduced_corridor_density.1
                 && reintroduced_corridor_density.1 >= 1,
         );
+        assert!(
+            corridor_cost > 0 && straight_cost > 0 && standard_cost > 0,
+            "The costs for the pathfinding of the corridors must be greater than 0",
+        );
 
         Self {
             min_room_dimension,
@@ -68,7 +80,9 @@ impl Configuration {
             max_fail_count,
             reintroduced_corridor_density,
             phantom: PhantomData,
+            corridor_cost,
+            straight_cost,
+            standard_cost,
         }
     }
 }
-
