@@ -10,12 +10,12 @@ const WEST: usize = 2;
 const SOUTH: usize = 3;
 
 /// Structure representing a rectangular room in the grid.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Room {
     pub bounds: Rectangle,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Doorway {
     pub room_index: usize,
     pub position: Vector2,
@@ -25,6 +25,13 @@ pub struct Doorway {
 pub struct Rooms {
     pub rooms: Vec<Room>,
     pub doorways: Vec<Doorway>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RoomGraph {
+    pub rooms: Vec<Room>,
+    pub doorways: Vec<Doorway>,
+    pub edges: Vec<(usize, usize)>,
 }
 
 /// Guarantees that there is at least min_padding cells
@@ -258,7 +265,7 @@ mod test {
 
     #[test]
     fn room_generation_max_rng() {
-        let configuration = Configuration::new(5, 20, 3, 2, 20);
+        let configuration = Configuration::new(5, 20, 3, 2, 20, (1, 2));
         let map_dimension = configuration.min_padding * 2 + configuration.min_room_dimension;
         let result = generate_rooms(
             &configuration,
@@ -275,7 +282,7 @@ mod test {
     }
 
     fn room_generation_failed_second_room() {
-        let configuration = Configuration::new(5, 20, 3, 2, 3);
+        let configuration = Configuration::new(5, 20, 3, 2, 3, (1, 2));
         let map_dimension = configuration.min_padding * 3 + 10;
         let map_dimensions = vec2u(map_dimension, map_dimension);
 
@@ -297,7 +304,7 @@ mod test {
     }
 
     fn room_generation_two_rooms_one_failure() {
-        let configuration = Configuration::new(5, 20, 3, 2, 3);
+        let configuration = Configuration::new(5, 20, 3, 2, 3, (1, 2));
         let map_dimension = configuration.min_padding * 3 + 10;
         let map_dimensions = vec2u(map_dimension, map_dimension);
         // x, y, width, height, doorway mask

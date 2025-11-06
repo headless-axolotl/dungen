@@ -1,5 +1,7 @@
 //! 2D Dungeon generator.
 
+pub mod grid;
+pub mod mst;
 pub mod rng;
 pub mod room;
 pub mod triangulation;
@@ -16,6 +18,9 @@ pub struct Configuration {
     pub min_padding: usize,
     pub doorway_offset: usize,
     pub max_fail_count: usize,
+    /// What proportion of edges on average should be reintroduced as corridors i.e. (0) out of
+    /// every (1).
+    pub reintroduced_corridor_density: (usize, usize),
     phantom: PhantomData<()>,
 }
 
@@ -27,6 +32,7 @@ impl Configuration {
         min_padding: usize,
         doorway_offset: usize,
         max_fail_count: usize,
+        reintroduced_corridor_density: (usize, usize),
     ) -> Self {
         assert!(
             min_room_dimension >= 5,
@@ -47,6 +53,10 @@ impl Configuration {
             "The doorway offset must be greater than 0 because \
             the doorways should not be in the corners of the rooms."
         );
+        assert!(
+            reintroduced_corridor_density.0 <= reintroduced_corridor_density.1
+                && reintroduced_corridor_density.1 >= 1,
+        );
 
         Self {
             min_room_dimension,
@@ -54,6 +64,7 @@ impl Configuration {
             min_padding,
             doorway_offset,
             max_fail_count,
+            reintroduced_corridor_density,
             phantom: PhantomData,
         }
     }

@@ -1,16 +1,9 @@
-use crate::room::{Doorway, Room, Rooms};
+use crate::room::{Doorway, Rooms, RoomGraph};
 use crate::vec::{point_in_circumcircle, vec2};
 
 use std::collections::HashSet;
 
 use raylib::math::Vector2;
-
-#[derive(Debug)]
-pub struct Triangulation {
-    pub rooms: Vec<Room>,
-    pub doorways: Vec<Doorway>,
-    pub edges: Vec<(usize, usize)>,
-}
 
 /// Makes edges with consistent point ordering.
 fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
@@ -19,7 +12,7 @@ fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
 
 /// Employs the Bowyer-Watson algorithm to create a Delaynay triangulation
 /// between the doorways of the rooms.
-pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> Triangulation {
+pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> RoomGraph {
     let Rooms {
         rooms,
         mut doorways,
@@ -131,7 +124,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> Triangulation {
         polygon.insert(make_edge(triangle.1, triangle.2));
     }
 
-    Triangulation {
+    RoomGraph {
         rooms,
         doorways,
         edges: polygon.drain().collect(),
