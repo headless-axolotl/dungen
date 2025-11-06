@@ -18,10 +18,10 @@ const CONTROLS: &str = "\
 const DRAW_OPTION_COUNT: usize = 2;
 
 #[cfg(not(tarpaulin_include))]
-fn draw_rooms<'a>(
+fn draw_rooms(
     scale: f32,
     offset: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'a>,
+    draw_handle: &mut RaylibDrawHandle<'_>,
     rooms: &[Room]
 ) {
     for room in rooms {
@@ -32,10 +32,10 @@ fn draw_rooms<'a>(
 }
 
 #[cfg(not(tarpaulin_include))]
-fn draw_doorways<'a>(
+fn draw_doorways(
     scale: f32,
     offset: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'a>,
+    draw_handle: &mut RaylibDrawHandle<'_>,
     doorways: &[Doorway]
 ) {
     for doorway in doorways {
@@ -48,10 +48,10 @@ fn draw_doorways<'a>(
 }
 
 #[cfg(not(tarpaulin_include))]
-fn draw_edges<'a>(
+fn draw_edges(
     scale: f32,
     offset: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'a>,
+    draw_handle: &mut RaylibDrawHandle<'_>,
     doorways: &[Doorway],
     edges: &[(usize, usize)]
 ) {
@@ -65,11 +65,11 @@ fn draw_edges<'a>(
 }
 
 #[cfg(not(tarpaulin_include))]
-fn draw_graph<'a>(
+fn draw_graph(
     scale: f32,
     offset: Vector2,
     grid_dimensions: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'a>,
+    draw_handle: &mut RaylibDrawHandle<'_>,
     graph: &RoomGraph,
 ) {
     draw_handle.draw_rectangle_v(offset, grid_dimensions * scale, Color::GRAY);

@@ -18,6 +18,9 @@ impl DisjointSet {
         }
     }
 
+    // Climb up the tree until the parent is found. On the way back
+    // reparent all the nodes in the path to the parent, reducing the 
+    // time for the next query.
     pub fn find_set(&mut self, entity: usize) -> usize {
         if self.parent[entity] == entity {
             return entity;
@@ -26,6 +29,7 @@ impl DisjointSet {
         self.parent[entity]
     }
 
+    // Merge the two sets based on their rank (depth of the corresponding tree).
     pub fn union_sets(&mut self, mut entity_a: usize, mut entity_b: usize) {
         entity_a = self.find_set(entity_a);
         entity_b = self.find_set(entity_b);
@@ -79,7 +83,7 @@ pub fn pick_corridors<R: Rng>(
     let tree = minimum_spanning_tree(&doorways, &mut edges);
 
     // Find the edges which are not part of the minimum spanning tree.
-    // Since the indices in the tree list are sorted we can do this in O(n) as such.
+    // Since the indices in the tree array are sorted we can do this in O(n) as such.
     let mut residual_edges: Vec<usize> = vec![];
     let mut tree_edge_index: usize = 0;
     for edge_index in 0..edges.len() {
@@ -93,7 +97,7 @@ pub fn pick_corridors<R: Rng>(
     let mut corridors: Vec<(usize, usize)> = vec![];
 
     // Add edges from the minimum spanning tree which connect
-    // doorways of different rooms to the corridor list.
+    // doorways of different rooms to the corridor array.
     let mut edge: (usize, usize);
     for edge_index in tree {
         edge = edges[edge_index];
@@ -107,7 +111,7 @@ pub fn pick_corridors<R: Rng>(
     // however, for the purposes of testing I need to be able to mock them.
     //
     // Randomly add edges not in the minimum spanning tree which connect
-    // doorways of different rooms to the corridor list.
+    // doorways of different rooms to the corridor array.
     for residual_edge_index in residual_edges {
         edge = edges[residual_edge_index];
         if doorways[edge.0].room_index == doorways[edge.1].room_index {

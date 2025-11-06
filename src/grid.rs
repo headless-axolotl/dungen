@@ -1,10 +1,14 @@
-mod astar;
+use crate::binary_heap::Heap;
+use crate::Configuration;
+use crate::a_star;
+use crate::room::RoomGraph;
+use crate::vec::to_index;
 
-use crate::{Configuration, room::RoomGraph};
+use std::fmt::Write;
 
 use raylib::math::Vector2;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tile {
     Blocker,
     Wall,
@@ -15,27 +19,255 @@ pub enum Tile {
     Empty,
 }
 
-#[derive(Debug)]
-pub struct Grid {
-    pub grid: Vec<Tile>,
+/// Convert a character to a tile.
+impl From<char> for Tile {
+    fn from(value: char) -> Self {
+        use Tile::*;
+        match value {
+            '%' => Blocker,
+            '#' => Wall,
+            '_' => Room,
+            'd' => Doorway,
+            'c' => Corridor,
+            '@' => CorridorNeighbor,
+            _ => Empty,
+        }
+    }
 }
 
-pub fn make_grid(config: &Configuration, grid_dimensions: Vector2, room_graph: RoomGraph) -> Grid {
+/// Convert a tile to a character.
+impl From<Tile> for char {
+    fn from(value: Tile) -> Self {
+        use Tile::*;
+        match value {
+            Blocker => '%',
+            Wall => '#',
+            Room => '_',
+            Doorway => 'd',
+            Corridor => 'c',
+            CorridorNeighbor => '@',
+            Empty => '.',
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct Grid {
+    pub width: usize,
+    pub tiles: Vec<Tile>,
+}
+
+/// Convert the grid into a string.
+impl std::fmt::Display for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut index = 0;
+        for _ in 0..self.tiles.len() / self.width {
+            for _ in 0..self.width {
+                f.write_char(self.tiles[index].into())?;
+                index += 1;
+            }
+            f.write_char('\n')?;
+        }
+        Ok(())
+    }
+}
+
+/// Convert a string into a grid. Assumes the string is a valid grid,
+/// however, it does not error or panic if it isn't.
+impl From<&str> for Grid {
+    fn from(value: &str) -> Self {
+        let mut height: usize = 0;
+        let mut result = Grid {
+            width: 0,
+            tiles: vec![],
+        };
+        for line in value.lines() {
+            for character in line.chars() {
+                result.tiles.push(character.into());
+            }
+            height += 1;
+        }
+        result.width = result.tiles.len() / height;
+        result
+    }
+}
+
+/// Places a corridor in the grid. Surrounds the corridor with marker tiles
+/// so that the search algorithm knows to avoid creating 2x2 corridor tile blocks.
+/// When there is a turn in the corridor, places a blockin tile again to prevent
+/// the pathfinding algorithm from creating 2x2 corridor tile blocks.
+fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
     use Tile::*;
 
-    let width = grid_dimensions.x as usize;
-    let height = grid_dimensions.y as usize;
-    let grid: Vec<Tile> = vec![Wall; width * height];
+    #[inline]
+    fn place_corridor_neighbor(index: usize, tiles: &mut [Tile]) {
+        if matches!(tiles[index], CorridorNeighbor) {
+            // There was a turn in the corridor.
+            tiles[index] = Blocker;
+        } else if matches!(tiles[index], Wall) {
+            tiles[index] = CorridorNeighbor;
+        }
+    }
 
-    // Make grid outline
+    // The first and the last tiles in the path are doorways.
+    let mut previous = path[0];
+    for &current in &path[1..] {
+        if !matches!(tiles[current], Doorway) {
+            tiles[current] = Corridor;
+        }
 
-    // Carve rooms
+        let (neighbor_a, neighbor_b) = if a_star::diff(previous, current) == 1 {
+            // We moved horizontally, therefore, the corridor neighbors should be placed
+            // above and below the previous tile.
+            (previous + width, previous - width)
+        } else {
+            (previous + 1, previous - 1)
+        };
 
-    // Make room borders
+        place_corridor_neighbor(neighbor_a, tiles);
+        place_corridor_neighbor(neighbor_b, tiles);
 
-    // Place doorways which participate in corridors
+        previous = current;
+    }
+}
 
-    // Carve corridors
+pub fn make_grid(
+    _configuration: &Configuration,
+    grid_dimensions: Vector2,
+    room_graph: &RoomGraph,
+) -> Grid {
+    use Tile::*;
 
-    Grid { grid }
+    let grid_width = grid_dimensions.x as usize;
+    let grid_height = grid_dimensions.y as usize;
+    let mut tiles: Vec<Tile> = vec![Wall; grid_width * grid_height];
+
+    // Create a one wide perimeter of blocking tiles around the grid.
+    // Removes the need to check for edge cases when generating neighbors of a tile.
+    for column in 0..grid_width {
+        tiles[column] = Blocker; // north
+        tiles[column + grid_width * (grid_height - 1)] = Blocker; // south
+    }
+    for row in 0..grid_height {
+        tiles[row * grid_width] = Blocker; // west
+        tiles[row * grid_width + grid_width - 1] = Blocker; // east
+    }
+
+    // Carve the rectangles the rooms occupy and place a one wide
+    // perimeter of blocking tiles. Some of the blocking tiles will
+    // be replaced by doorways in the following step. One can enter
+    // a room only through a doorway.
+    for room in &room_graph.rooms {
+        let top_left_corner = room.bounds.x as usize + room.bounds.y as usize * grid_width;
+        let room_width = room.bounds.width as usize;
+        let room_height = room.bounds.height as usize;
+        for row in 0..room_height {
+            for column in 0..room_width {
+                tiles[top_left_corner + row * grid_width + column] = Room;
+            }
+        }
+
+        // Move the corner up and to the left.
+        let top_left_corner = top_left_corner - grid_width - 1;
+        for column in 0..room_width + 2 {
+            tiles[top_left_corner + column] = Blocker; // north
+            tiles[top_left_corner + column + grid_width * (room_height + 1)] = Blocker; // south
+        }
+        for row in 0..room_height + 2 {
+            tiles[top_left_corner + row * grid_width] = Blocker; // west
+            tiles[top_left_corner + row * grid_width + room_width + 1] = Blocker; // east
+        }
+    }
+
+    let mut open_set: Heap<usize, usize> = Heap::with_capacity(tiles.len() / 4);
+    let mut g_scores: Vec<usize> = vec![];
+    let mut parent: Vec<usize> = vec![];
+    let mut path: Vec<usize> = vec![];
+    
+    // Place doorways (which replace blocking tiles around the rooms) and create corridors.
+    for edge in &room_graph.edges {
+        tiles[to_index(room_graph.doorways[edge.0].position, grid_width)] = Doorway;
+        tiles[to_index(room_graph.doorways[edge.1].position, grid_width)] = Doorway;
+        a_star::a_star(
+            to_index(room_graph.doorways[edge.0].position, grid_width),
+            to_index(room_graph.doorways[edge.1].position, grid_width),
+            grid_width,
+            &tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+
+        if path.is_empty() {
+            unreachable!("There should always be a path between two doorways.");
+        }
+
+        place_corridor(grid_width, &mut tiles, &path);
+    }
+
+    Grid {
+        width: grid_width,
+        tiles,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn tile_characters() {
+        use Tile::*;
+        let tiles = [
+            Blocker,
+            Wall,
+            Room,
+            Doorway,
+            Corridor,
+            CorridorNeighbor,
+            Empty,
+        ];
+        for tile in &tiles {
+            assert_eq!(
+                *tile,
+                <Tile>::from(<char>::from(*tile)),
+                "Tile does not match char and vice versa."
+            );
+        }
+    }
+
+    #[test]
+    fn grid_serialization_deserialization() {
+        use Tile::*;
+        let grid = Grid {
+            width: 4,
+            tiles: vec![
+                Blocker,
+                Wall,
+                Room,
+                Doorway,
+                Doorway,
+                Corridor,
+                CorridorNeighbor,
+                Empty,
+            ],
+        };
+
+        let string: &str = "%#_d\ndc@.\n";
+        assert_eq!(
+            string,
+            format!("{}", grid),
+            "Grid does not display properly."
+        );
+
+        let result: Grid = string.into();
+        assert!(
+            grid.width == result.width && grid.tiles.len() == result.tiles.len(),
+            "Parsed grid does not match size."
+        );
+        assert_eq!(
+            grid.tiles, result.tiles,
+            "Parsed grid does not match contents."
+        );
+    }
 }

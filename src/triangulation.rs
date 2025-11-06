@@ -115,7 +115,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> RoomGraph {
     doorways.pop();
     doorways.pop();
 
-    // In subsequent steps it is better to have a list
+    // In subsequent steps it is better to have an array
     // of edges instead of the triangles.
     polygon.clear();
     for triangle in triangles {

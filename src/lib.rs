@@ -1,5 +1,7 @@
 //! 2D Dungeon generator.
 
+pub mod a_star;
+pub mod binary_heap;
 pub mod grid;
 pub mod mst;
 pub mod rng;

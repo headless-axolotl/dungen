@@ -20,7 +20,8 @@ connected is done based on a Delaunay triangulation of points on the rooms using
 Bowyer-Watson's algorithm. After the triangulation a Minimum Spanning Tree will
 be constructed using the Disjoint Set Union version of Kruskal's algorithm. This
 tree will then be modified by reintroducing randomly edges from the
-triangulation. A* will be used to create the corridors between the rooms.
+triangulation. A* will be used to create the corridors between the rooms. The
+priority queue in A* will be binary heap.
 
 List of possible features that may be added to the dungeon after generation:
 - Mazes in parts of rooms which are sufficiently large.
