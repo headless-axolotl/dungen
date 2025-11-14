@@ -34,9 +34,8 @@ pub struct RoomGraph {
     pub edges: Vec<(usize, usize)>,
 }
 
-/// Guarantees that there is at least min_padding cells
-/// distance between the two rectangles. We need only extend
-/// the rectangles down and to the right.
+/// Guarantees that there is at least min_padding cells distance between the two rectangles. We
+/// need only extend the rectangles down and to the right.
 pub fn overlap_with_padding(min_padding: usize, a: &Rectangle, b: &Rectangle) -> bool {
     let mut padded_a = *a;
     padded_a.width += min_padding as f32;
@@ -92,10 +91,9 @@ pub fn generate_doorways<R: Rng>(
     }
 }
 
-/// Randomly picks a position and then valid dimensions to place
-/// a room. Attempts to place a given amount of rooms but aborts
-/// the operation if there are a number of failed attempts specified
-/// in the configuration.
+/// Randomly picks a position and then valid dimensions to place a room. Attempts to place a given
+/// amount of rooms but aborts the operation if there are a number of failed attempts specified in
+/// the configuration.
 pub fn generate_rooms<R: Rng>(
     configuration: &Configuration,
     grid_dimensions: Vector2,
@@ -119,6 +117,8 @@ pub fn generate_rooms<R: Rng>(
     let mut room_count = 0;
     let mut fail_count = 0;
 
+    // Tarpaulin (code coverage) does not seem to be able to handle variable declarations without
+    // initialisation.
     let mut x: usize;
     let mut y: usize;
     let mut width_range: RangeInclusive<usize>;
@@ -281,6 +281,9 @@ mod test {
         );
     }
 
+    // In this and the following test we do not care about generating doorways, so the mock_rng
+    // chooses a number outside the range of possible doorway masks.
+    #[test]
     fn room_generation_failed_second_room() {
         let configuration = Configuration { 
             max_fail_count: 3,
@@ -306,6 +309,7 @@ mod test {
         assert_eq!(result.rooms.len(), 1, "There should be exactly 1 room.");
     }
 
+    #[test]
     fn room_generation_two_rooms_one_failure() {
         let configuration = Configuration { 
             max_fail_count: 3,
@@ -329,13 +333,5 @@ mod test {
         );
 
         assert_eq!(result.rooms.len(), 2, "There should be exactly 2 rooms.");
-    }
-
-    #[test]
-    fn room_generation_specific_rng() {
-        // In these tests we do not care about generating doorways, so the mock_rng chooses a
-        // number outside the range of possible doorway masks.
-        room_generation_failed_second_room();
-        room_generation_two_rooms_one_failure();
     }
 }

@@ -9,10 +9,9 @@ where
     K: Default + Clone + Copy + PartialOrd + Ord + PartialEq + Eq,
     T: Default + Clone + Copy,
 {
-    // I insert a dummy element, because the calculations of the
-    // indices of a 1-based binary heap are easier. Since the number
-    // of elements in the graph is known usually I provide a facility
-    // to preallocate the needed number of slots in the arrays.
+    /// Inserts a dummy element, because the calculations of the indices of a 1-based binary heap
+    /// are easier. Since the number of elements in the graph is usually known, a facility to
+    /// preallocate the needed number of slots in the arrays is provided.
     pub fn with_capacity(capacity: usize) -> Self {
         let mut keys = Vec::with_capacity(capacity);
         let mut aux = Vec::with_capacity(capacity);
@@ -23,7 +22,7 @@ where
         Self { keys, aux, len: 0 }
     }
 
-    // Returns the minimum element if it exists without removing it from the heap.
+    /// Returns the minimum element if it exists without removing it from the heap.
     pub fn min(&self) -> Option<(K, T)> {
         if self.len == 0 {
             None
@@ -32,7 +31,7 @@ where
         }
     }
 
-    // Utility procedure to update the heap after inserting an element.
+    /// Utility procedure to update the heap after inserting an element.
     fn ascend(&mut self, mut index: usize) {
         let mut parent = index >> 1;
         while parent > 0 {
@@ -47,7 +46,7 @@ where
         }
     }
 
-    // Utility procedure to update the heap after removing an element.
+    /// Utility procedure to update the heap after removing an element.
     fn descend(&mut self, mut index: usize) {
         let mut left_child = index << 1;
         let mut right_child;
@@ -79,6 +78,7 @@ where
         self.aux.swap(a, b);
     }
 
+    /// Inserts an element into the heap.
     pub fn insert(&mut self, key: K, aux: T) {
         let new_index = self.keys.len();
         self.keys.push(key);
@@ -87,7 +87,7 @@ where
         self.len += 1;
     }
 
-    // Returns the minimum element if it exists and removes it from the queue.
+    /// Returns the minimum element if it exists and removes it from the queue.
     pub fn extract_min(&mut self) -> Option<(K, T)> {
         if self.len == 0 {
             return None;

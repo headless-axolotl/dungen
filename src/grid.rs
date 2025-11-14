@@ -124,6 +124,9 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
     }
 }
 
+/// Takes a room graph and creates the corresponding grid given the options in the configuration
+/// structure. Uses the A* algorithm to carve corridors between the rooms, while ensuring that no
+/// corridors make a 2x2 square (aesthetic choice).
 pub fn make_grid(
     configuration: &Configuration,
     grid_dimensions: Vector2,

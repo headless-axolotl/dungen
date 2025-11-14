@@ -11,6 +11,7 @@ pub struct DisjointSet {
 }
 
 impl DisjointSet {
+    /// Creates a new DisjointSet structure, reserving space for a given number of entities.
     pub fn new(entity_count: usize) -> Self {
         Self {
             parent: (0..entity_count).collect(),
@@ -18,9 +19,8 @@ impl DisjointSet {
         }
     }
 
-    // Climb up the tree until the parent is found. On the way back
-    // reparent all the nodes in the path to the parent, reducing the
-    // time for the next query.
+    /// Climb up the tree until the parent is found. On the way back reparent all the nodes in the
+    /// path to the parent, reducing the time for the next query.
     pub fn find_set(&mut self, entity: usize) -> usize {
         if self.parent[entity] == entity {
             return entity;
@@ -29,7 +29,7 @@ impl DisjointSet {
         self.parent[entity]
     }
 
-    // Merge the two sets based on their rank (depth of the corresponding tree).
+    /// Merge the two sets based on their rank (depth of the corresponding tree).
     pub fn union_sets(&mut self, mut entity_a: usize, mut entity_b: usize) {
         entity_a = self.find_set(entity_a);
         entity_b = self.find_set(entity_b);

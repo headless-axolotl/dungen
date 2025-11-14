@@ -15,17 +15,29 @@ pub mod mock;
 use std::marker::PhantomData;
 
 pub struct Configuration {
+    /// Minimum tile length of a room. Valid for both width and height.
     pub min_room_dimension: usize,
+    /// Maximum tile length of a room. Must be greater than or equal to the minimum.
     pub max_room_dimension: usize,
+    /// The minimum distance between rooms and the map border to guarantee that doorways are
+    /// accessible.
     pub min_padding: usize,
+    /// Offset from the edges of the room. Aesthetic option.
     pub doorway_offset: usize,
+    /// The number of failed attempts to place a room before we abort the algorithm. The bigger the
+    /// number the higher the likelyhood that the target room count is reached. 
     pub max_fail_count: usize,
     /// What proportion of edges on average should be reintroduced as corridors i.e. (0) out of
     /// every (1).
     pub reintroduced_corridor_density: (usize, usize),
-    // The costs which of different types of corridors.
+    /// Cost for the A* algorithm when we go through an already placed corridor. The relationship
+    /// between this value and the other two costs determines the shape of the corridors.
     pub corridor_cost: usize,
+    /// Cost for the A* algorithm when we go to a tile which is in the same direction (horizontal
+    /// or vertical) from which we came to the current tile. When lower than the standard cost
+    /// makes the corridors straight hence the name.
     pub straight_cost: usize,
+    /// Default cost for the A* algorithm. The corridors can move only horizontally or vertically.
     pub standard_cost: usize,
     phantom: PhantomData<()>,
 }
