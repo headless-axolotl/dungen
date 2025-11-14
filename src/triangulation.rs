@@ -137,7 +137,7 @@ mod test {
     use crate::vec::vec2u;
 
     /// Shorthand for creating a doorway.
-    fn point(x: usize, y: usize) -> Doorway {
+    fn doorway(x: usize, y: usize) -> Doorway {
         Doorway {
             room_index: 0,
             position: vec2u(x, y),
@@ -150,7 +150,7 @@ mod test {
         let grid_dimensions = vec2u(100, 100);
         let rooms = Rooms {
             rooms: vec![],
-            doorways: vec![point(1, 1), point(2, 1), point(1, 2)],
+            doorways: vec![doorway(1, 1), doorway(2, 1), doorway(1, 2)],
         };
 
         let result = triangulate(grid_dimensions, rooms);
@@ -159,11 +159,34 @@ mod test {
             3,
             "There should be exactly 1 triangle and exactly 3 edges."
         );
-        assert!(
-            result.edges.contains(&(0, 1))
-                && result.edges.contains(&(1, 2))
-                && result.edges.contains(&(0, 2)),
-            "The result does not contain all the correct edges."
+        for edge in &[(0, 1), (1, 2), (0, 2)] {
+            assert!(
+                result.edges.contains(edge),
+                "The result does not contain all the correct edges."
+            );
+        }
+    }
+
+    #[test]
+    fn triangulation_with_more_vertices() {
+        let grid_dimensions = vec2u(100, 100);
+        let rooms = Rooms {
+            rooms: vec![],
+            doorways: vec![doorway(1, 1), doorway(3, 1), doorway(1, 3), doorway(2, 2)],
+        };
+
+        let result = triangulate(grid_dimensions, rooms);
+        assert_eq!(
+            result.edges.len(),
+            5,
+            "There should be exactly 2 triangles and exactly 5 edges."
         );
+
+        for edge in &[(0, 1), (0, 2), (1, 3), (2, 3), (0, 3)] {
+            assert!(
+                result.edges.contains(edge),
+                "The result does not contain all the correct edges."
+            );
+        }
     }
 }

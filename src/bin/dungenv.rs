@@ -75,6 +75,7 @@ fn draw_graph(
     draw_edges(scale, offset, draw_handle, &graph.doorways, &graph.edges);
 }
 
+#[cfg(not(tarpaulin_include))]
 fn draw_grid_to_image(
     configuration: &Configuration,
     grid_dimensions: Vector2,
@@ -101,11 +102,11 @@ fn draw_grid_to_image(
 
 #[cfg(not(tarpaulin_include))]
 fn main() {
-    let (mut rl, thread) = raylib::init().size(640, 640).title("Dungeon").build();
+    let (mut rl, thread) = raylib::init().size(1280, 720).title("Dungeon").build();
 
     let mut rng = rand::rng();
     let grid_dimensions = vec2i(100, 100);
-    let configuration = Configuration::new(5, 20, 3, 2, 100, (1, 5), 1, 2, 3);
+    let configuration = Configuration::default();
     let mut rooms = generate_rooms(&configuration, grid_dimensions, Some(30), &mut rng);
     let mut triangulation = triangulate(grid_dimensions, rooms);
     let mut corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
@@ -119,9 +120,9 @@ fn main() {
 
     let mut draw_option: usize = 0;
 
-    let mut scale: f32 = 2.0;
+    let mut scale: f32 = 5.0;
     let speed: f32 = 20.0;
-    let window_center: Vector2 = vec2i(640, 640) / 2.0;
+    let window_center: Vector2 = vec2i(1280, 720) / 2.0;
     let mut offset: Vector2 = window_center - grid_dimensions * scale / 2.0;
 
     while !rl.window_should_close() {
@@ -137,7 +138,7 @@ fn main() {
         let dt = rl.get_frame_time();
 
         if rl.is_key_pressed(KeyboardKey::KEY_C) {
-            scale = 2.0;
+            scale = 5.0;
             offset = window_center - grid_dimensions * scale / 2.0;
         }
 
@@ -154,8 +155,8 @@ fn main() {
         if rl.is_key_down(KeyboardKey::KEY_O) {
             let previous_scale = scale;
             scale -= 10.0 * dt;
-            if scale < 1.0 {
-                scale = 1.0;
+            if scale < 5.0 {
+                scale = 5.0;
             }
             offset = (offset - window_center) * scale / previous_scale + window_center;
         }

@@ -31,58 +31,44 @@ pub struct Configuration {
 }
 
 impl Configuration {
-    #[cfg(not(tarpaulin_include))]
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        min_room_dimension: usize,
-        max_room_dimension: usize,
-        min_padding: usize,
-        doorway_offset: usize,
-        max_fail_count: usize,
-        reintroduced_corridor_density: (usize, usize),
-        corridor_cost: usize,
-        straight_cost: usize,
-        standard_cost: usize,
-    ) -> Self {
-        assert!(
-            min_room_dimension >= 5,
-            "The minimum room size must be greater than 4."
-        );
-        assert!(
-            min_room_dimension <= max_room_dimension,
-            "The maximum room size must be greater or equal to \
-            the minimum room size."
-        );
-        assert!(
-            min_padding > 2,
-            "The minimum padding must be greater than or equal to 3 \
-            to leave enough space for corridors."
-        );
-        assert!(
-            doorway_offset > 0,
-            "The doorway offset must be greater than 0 because \
-            the doorways should not be in the corners of the rooms."
-        );
-        assert!(
-            reintroduced_corridor_density.0 <= reintroduced_corridor_density.1
-                && reintroduced_corridor_density.1 >= 1,
-        );
-        assert!(
-            corridor_cost > 0 && straight_cost > 0 && standard_cost > 0,
-            "The costs for the pathfinding of the corridors must be greater than 0",
-        );
-
-        Self {
-            min_room_dimension,
-            max_room_dimension,
-            min_padding,
-            doorway_offset,
-            max_fail_count,
-            reintroduced_corridor_density,
-            phantom: PhantomData,
-            corridor_cost,
-            straight_cost,
-            standard_cost,
+    pub fn is_valid(&self) -> bool {
+        if self.min_room_dimension < 5 { return false }
+        if self.min_room_dimension > self.max_room_dimension { return false }
+        if self.min_padding < 3 { return false }
+        if self.doorway_offset < 1 { return false }
+        if self.reintroduced_corridor_density.0 > self.reintroduced_corridor_density.1
+            || self.reintroduced_corridor_density.1 < 1 {
+            return false
         }
+        if self.corridor_cost < 1 || self.straight_cost < 1 || self.standard_cost < 1 {
+            return false
+        }
+        true
+    }
+}
+
+impl Default for Configuration {
+    fn default() -> Self {
+        Self {
+            min_room_dimension: 5,
+            max_room_dimension: 20,
+            min_padding: 3,
+            doorway_offset: 2,
+            max_fail_count: 10,
+            reintroduced_corridor_density: (1, 2),
+            corridor_cost: 1,
+            straight_cost: 2,
+            standard_cost: 3,
+            phantom: Default::default(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn default_values_are_correct() {
+        let config = super::Configuration::default();
+        assert!(config.is_valid(), "Default configuration should be valid.");
     }
 }

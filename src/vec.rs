@@ -66,6 +66,7 @@ mod test {
             "Point should not have been in the circumcircle."
         );
 
+        // Test with very big numbers.
         assert!(
             point_in_circumcircle(
                 vec2i(700, 1000),
