@@ -20,9 +20,10 @@ const CONTROLS: &str = "\
 ";
 
 const MAX_ROOM_COUNT: usize = 2_000;
+const MAX_MAP_DIMENSIONS: usize = 512;
 
 #[cfg(not(tarpaulin_include))]
-fn draw_rooms(scale: f32, offset: Vector2, draw_handle: &mut RaylibDrawHandle<'_>, rooms: &[Room]) {
+fn draw_rooms(scale: f32, offset: Vector2, draw_handle: &mut impl RaylibDraw, rooms: &[Room]) {
     for room in rooms {
         let room_corner = offset + vec2(room.bounds.x, room.bounds.y) * scale;
         let room_dimensions = vec2(room.bounds.width, room.bounds.height) * scale;
@@ -34,7 +35,7 @@ fn draw_rooms(scale: f32, offset: Vector2, draw_handle: &mut RaylibDrawHandle<'_
 fn draw_doorways(
     scale: f32,
     offset: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'_>,
+    draw_handle: &mut impl RaylibDraw,
     doorways: &[Doorway],
 ) {
     for doorway in doorways {
@@ -50,7 +51,7 @@ fn draw_doorways(
 fn draw_edges(
     scale: f32,
     offset: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'_>,
+    draw_handle: &mut impl RaylibDraw,
     doorways: &[Doorway],
     edges: &[(usize, usize)],
 ) {
@@ -68,7 +69,7 @@ fn draw_graph(
     scale: f32,
     offset: Vector2,
     grid_dimensions: Vector2,
-    draw_handle: &mut RaylibDrawHandle<'_>,
+    draw_handle: &mut impl RaylibDraw,
     graph: &RoomGraph,
 ) {
     draw_handle.draw_rectangle_v(offset, grid_dimensions * scale, Color::GRAY);
@@ -79,27 +80,20 @@ fn draw_graph(
 }
 
 #[cfg(not(tarpaulin_include))]
-fn draw_grid_to_image(
-    // configuration: &Configuration,
-    // grid_dimensions: Vector2,
-    // room_graph: &RoomGraph,
-    grid: &Grid,
-    image: &mut Image,
-) {
+fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw) {
     use dungen::grid::Tile::*;
-    // let grid = make_grid(configuration, grid_dimensions, room_graph);
-    image.clear_background(Color::BROWN);
+    draw_handle.clear_background(Color::BROWN);
     for tile_index in 0..grid.tiles.len() {
         let x = (tile_index % grid.width) as i32;
         let y = (tile_index / grid.width) as i32;
         if matches!(grid.tiles[tile_index], Room | Corridor | Doorway) {
-            image.draw_pixel(x, y, Color::YELLOW);
+            draw_handle.draw_pixel(x, y, Color::YELLOW);
         }
         // if matches!(grid.tiles[tile_index], Blocker) {
-        //     image.draw_pixel(x, y, Color::BLACK);
+        //     draw_handle.draw_pixel(x, y, Color::PURPLE);
         // }
         // if matches!(grid.tiles[tile_index], CorridorNeighbor) {
-        //     image.draw_pixel(x, y, Color::YELLOWGREEN);
+        //     draw_handle.draw_pixel(x, y, Color::YELLOWGREEN);
         // }
     }
 }
@@ -135,6 +129,7 @@ struct Generator {
     handle: JoinHandle<()>,
 }
 
+#[cfg(not(tarpaulin_include))]
 fn make_generator() -> Generator {
     let (requests, request_receiver) = mpsc::channel::<Request>();
     let (results_sender, results) = mpsc::channel::<Result>();
@@ -222,6 +217,20 @@ fn main() {
     // ============================== Configuration variables
 
     // ============================== State variables
+    let mut source_rectangle = Rectangle::new(
+        0.0,
+        (MAX_MAP_DIMENSIONS - grid_height) as f32,
+        grid_width as f32,
+        -(grid_height as f32),
+    );
+    let mut render_texture = match rl.load_render_texture(
+        &thread,
+        MAX_MAP_DIMENSIONS as u32,
+        MAX_MAP_DIMENSIONS as u32,
+    ) {
+        Ok(value) => value,
+        _ => return,
+    };
     let mut generating = false;
     let generator = make_generator();
     // Generate a grid that won't take much time before the start of the application.
@@ -243,10 +252,10 @@ fn main() {
     } else {
         return;
     };
+    rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
+        draw_grid(&grid, &mut handle);
+    });
     let mut dimensions_changed: bool = false;
-    let mut image = Image::gen_image_color(grid_width as i32, grid_height as i32, Color::BROWN);
-    draw_grid_to_image(&grid, &mut image);
-    let mut texture = rl.load_texture_from_image(&thread, &image);
     let mut draw_option: DrawOption = DrawOption::Grid;
     // ============================== State variables
 
@@ -384,16 +393,15 @@ fn main() {
                     dimensions_changed |= ui.slider(
                         "Grid Width",
                         configuration.min_room_dimension + configuration.min_padding * 2,
-                        512,
+                        MAX_MAP_DIMENSIONS,
                         &mut grid_width,
                     );
                     dimensions_changed |= ui.slider(
                         "Grid Height",
                         configuration.min_room_dimension + configuration.min_padding * 2,
-                        512,
+                        MAX_MAP_DIMENSIONS,
                         &mut grid_height,
                     );
-                    grid_dimensions = vec2u(grid_width, grid_height);
                 } // ============================== grid dimensions
 
                 let max_room_count = (grid_height * grid_width).min(MAX_ROOM_COUNT);
@@ -412,7 +420,7 @@ fn main() {
                     generating = true;
                     if generator.requests.send(Request::New {
                         configuration: configuration.clone(),
-                        grid_dimensions,
+                        grid_dimensions: vec2u(grid_width, grid_height),
                         target_room_count
                     }).is_err() {
                         return;
@@ -423,7 +431,7 @@ fn main() {
                     generating = true;
                     if generator.requests.send(Request::Corridors {
                         configuration: configuration.clone(),
-                        grid_dimensions,
+                        grid_dimensions: vec2u(grid_width, grid_height),
                         triangulation: triangulation.clone()
                     }).is_err() {
                         return;
@@ -460,7 +468,7 @@ fn main() {
                     .requests
                     .send(Request::New {
                         configuration: configuration.clone(),
-                        grid_dimensions,
+                        grid_dimensions: vec2u(grid_width, grid_height),
                         target_room_count,
                     })
                     .is_err()
@@ -503,6 +511,7 @@ fn main() {
         }
         // ============================== Input
 
+        //
         match generator.results.try_recv() {
             Ok(result) => {
                 match result {
@@ -512,15 +521,22 @@ fn main() {
                         grid: new_grid,
                     } => {
                         if dimensions_changed {
-                            image.resize_nn(grid_width as i32, grid_height as i32);
                             offset = view_center - grid_dimensions * scale / 2.0;
+                            grid_dimensions = vec2u(grid_width, grid_height);
+                            source_rectangle = Rectangle::new(
+                                0.0,
+                                MAX_MAP_DIMENSIONS as f32 - grid_dimensions.y,
+                                grid_dimensions.x,
+                                -grid_dimensions.y,
+                            );
                             dimensions_changed = false;
                         }
                         triangulation = new_triangulation;
                         corridors = new_corridors;
                         grid = new_grid;
-                        draw_grid_to_image(&grid, &mut image);
-                        texture = rl.load_texture_from_image(&thread, &image);
+                        rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
+                            draw_grid(&grid, &mut handle);
+                        });
                     }
                     Result::Corridors {
                         corridors: new_corridors,
@@ -528,8 +544,9 @@ fn main() {
                     } => {
                         corridors = new_corridors;
                         grid = new_grid;
-                        draw_grid_to_image(&grid, &mut image);
-                        texture = rl.load_texture_from_image(&thread, &image);
+                        rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
+                            draw_grid(&grid, &mut handle);
+                        });
                     }
                 }
                 generating = false;
@@ -548,9 +565,20 @@ fn main() {
         use DrawOption::*;
         match draw_option {
             Grid => {
-                if let Ok(texture) = &texture {
-                    draw_handle.draw_texture_ex(texture, offset, 0.0, scale, Color::WHITE)
-                }
+                let destination_rectangle = Rectangle::new(
+                    offset.x,
+                    offset.y,
+                    grid_dimensions.x * scale,
+                    grid_dimensions.y * scale,
+                );
+                draw_handle.draw_texture_pro(
+                    &render_texture,
+                    source_rectangle,
+                    destination_rectangle,
+                    vec2(0.0, 0.0),
+                    0.0,
+                    Color::WHITE,
+                );
             }
             Corridors => draw_graph(scale, offset, grid_dimensions, &mut draw_handle, &corridors),
             Triangulation => draw_graph(
