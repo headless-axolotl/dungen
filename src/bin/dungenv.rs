@@ -614,7 +614,6 @@ fn main() {
         }
         // ============================== Visual feedback for dungeon generation
 
-
         // ============================== Drawing
 
         gui.end();

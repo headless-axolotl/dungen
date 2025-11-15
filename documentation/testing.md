@@ -8,15 +8,14 @@ Unit test coverage is reported using the crate
 This tool is not entirely accurate so even though it reports test coverage below
 100%, some of the lines that are reportedly skipped cannot be as lines before
 them are not skipped. This can be more clearly seen by generating the **html**
-output by running `cargo tarpaulin --out Html`. Running just the tests without
-code coverage can be done by running `cargo test`.
+output by running `cargo tarpaulin --engine llvm --out Html`. Running just the
+tests without code coverage can be done by running `cargo test`.
 
 Unit tests which test the functionality of a given module live in the same file
 as that module. They are in the submodule `test` which is marked by
 `#[cfg(test)]`.
 
-As of the last commit the coverage is: 93.32%.
-The most faulty report tarpaulin gives is in `room.rs`.
+As of the last commit the coverage is: 97.73%.
 
 ## Methodology
 

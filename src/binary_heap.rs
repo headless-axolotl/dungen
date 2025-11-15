@@ -156,6 +156,7 @@ mod test {
         assert_eq!(heap.len, 2, "Size of the heap is incorrect.");
         heap.extract_min().unwrap();
         heap.extract_min().unwrap();
-        assert!(heap.is_empty(), "Heap should be empty.")
+        assert!(heap.is_empty(), "Heap should be empty.");
+        assert_eq!(heap.min(), None, "Output of min should be None.");
     }
 }
