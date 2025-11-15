@@ -63,7 +63,8 @@ pub fn generate_doorways<R: Rng>(
 
     if doorway_mask & (1 << EAST) != 0 {
         doorways.push(Doorway {
-            room_index, position: corner
+            room_index,
+            position: corner
                 + vec2(
                     room.bounds.width,
                     rng.random_range(vertical_range.clone()) as f32,
@@ -72,17 +73,20 @@ pub fn generate_doorways<R: Rng>(
     }
     if doorway_mask & (1 << NORTH) != 0 {
         doorways.push(Doorway {
-            room_index, position: corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0),
+            room_index,
+            position: corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0),
         });
     }
     if doorway_mask & (1 << WEST) != 0 {
         doorways.push(Doorway {
-            room_index, position: corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32),
+            room_index,
+            position: corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32),
         });
     }
     if doorway_mask & (1 << SOUTH) != 0 {
         doorways.push(Doorway {
-            room_index, position: corner
+            room_index,
+            position: corner
                 + vec2(
                     rng.random_range(horizontal_range.clone()) as f32,
                     room.bounds.height,
@@ -109,8 +113,8 @@ pub fn generate_rooms<R: Rng>(
     let min_room_dimension = configuration.min_room_dimension;
     let max_room_dimension = configuration.max_room_dimension;
 
-    let target_room_count = target_room_count
-        .unwrap_or((grid_dimensions.x * grid_dimensions.y) as usize);
+    let target_room_count =
+        target_room_count.unwrap_or((grid_dimensions.x * grid_dimensions.y) as usize);
     let x_range = min_padding..=(grid_dimensions.x as usize - min_room_dimension - min_padding);
     let y_range = min_padding..=(grid_dimensions.y as usize - min_room_dimension - min_padding);
 
@@ -128,7 +132,9 @@ pub fn generate_rooms<R: Rng>(
     let mut rectangle: Rectangle;
 
     'outer: while room_count < target_room_count {
-        if fail_count > configuration.max_fail_count { break; }
+        if fail_count > configuration.max_fail_count {
+            break;
+        }
 
         x = rng.random_range(x_range.clone());
         y = rng.random_range(y_range.clone());
@@ -285,7 +291,7 @@ mod test {
     // chooses a number outside the range of possible doorway masks.
     #[test]
     fn room_generation_failed_second_room() {
-        let configuration = Configuration { 
+        let configuration = Configuration {
             max_fail_count: 3,
             ..Default::default()
         };
@@ -293,44 +299,28 @@ mod test {
         let map_dimensions = vec2u(map_dimension, map_dimension);
 
         // x, y, width, height, doorway mask
-        let mut numbers: Vec<usize> = vec![
-            0, 0, 5, 5, 0,
-        ];
+        let mut numbers: Vec<usize> = vec![0, 0, 5, 5, 0];
         numbers.append(&mut [6, 6, 5, 5].repeat(configuration.max_fail_count + 1));
         let mut mock_rng = MockRng::new(numbers);
 
-        let result = generate_rooms(
-            &configuration,
-            map_dimensions,
-            None,
-            &mut mock_rng,
-        );
+        let result = generate_rooms(&configuration, map_dimensions, None, &mut mock_rng);
 
         assert_eq!(result.rooms.len(), 1, "There should be exactly 1 room.");
     }
 
     #[test]
     fn room_generation_two_rooms_one_failure() {
-        let configuration = Configuration { 
+        let configuration = Configuration {
             max_fail_count: 3,
             ..Default::default()
         };
         let map_dimension = configuration.min_padding * 3 + 10;
         let map_dimensions = vec2u(map_dimension, map_dimension);
         // x, y, width, height, doorway mask
-        let numbers: Vec<usize> = vec![
-            0, 0, 5, 5, 0,
-            6, 6, 5, 5,
-            9, 9, 5, 5, 0,
-        ];
+        let numbers: Vec<usize> = vec![0, 0, 5, 5, 0, 6, 6, 5, 5, 9, 9, 5, 5, 0];
         let mut mock_rng = MockRng::new(numbers);
 
-        let result = generate_rooms(
-            &configuration,
-            map_dimensions,
-            Some(2),
-            &mut mock_rng,
-        );
+        let result = generate_rooms(&configuration, map_dimensions, Some(2), &mut mock_rng);
 
         assert_eq!(result.rooms.len(), 2, "There should be exactly 2 rooms.");
     }

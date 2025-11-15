@@ -1,9 +1,12 @@
 use dungen::Configuration;
-use dungen::grid::make_grid;
+use dungen::grid::{Grid, make_grid};
 use dungen::mst::pick_corridors;
 use dungen::room::{Doorway, Room, RoomGraph, generate_rooms};
 use dungen::triangulation::triangulate;
 use dungen::vec::{vec2, vec2u};
+
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread::JoinHandle;
 
 use raylib::prelude::*;
 use raylib_imgui::RaylibGui;
@@ -77,13 +80,14 @@ fn draw_graph(
 
 #[cfg(not(tarpaulin_include))]
 fn draw_grid_to_image(
-    configuration: &Configuration,
-    grid_dimensions: Vector2,
-    room_graph: &RoomGraph,
+    // configuration: &Configuration,
+    // grid_dimensions: Vector2,
+    // room_graph: &RoomGraph,
+    grid: &Grid,
     image: &mut Image,
 ) {
     use dungen::grid::Tile::*;
-    let grid = make_grid(configuration, grid_dimensions, room_graph);
+    // let grid = make_grid(configuration, grid_dimensions, room_graph);
     image.clear_background(Color::BROWN);
     for tile_index in 0..grid.tiles.len() {
         let x = (tile_index % grid.width) as i32;
@@ -100,6 +104,101 @@ fn draw_grid_to_image(
     }
 }
 
+enum Request {
+    New {
+        configuration: Configuration,
+        grid_dimensions: Vector2,
+        target_room_count: usize,
+    },
+    Corridors {
+        configuration: Configuration,
+        grid_dimensions: Vector2,
+        triangulation: RoomGraph,
+    },
+}
+
+enum Result {
+    New {
+        triangulation: RoomGraph,
+        corridors: RoomGraph,
+        grid: Grid,
+    },
+    Corridors {
+        corridors: RoomGraph,
+        grid: Grid,
+    },
+}
+
+struct Generator {
+    requests: Sender<Request>,
+    results: Receiver<Result>,
+    handle: JoinHandle<()>,
+}
+
+fn make_generator() -> Generator {
+    let (requests, request_receiver) = mpsc::channel::<Request>();
+    let (results_sender, results) = mpsc::channel::<Result>();
+
+    let handle = std::thread::spawn(move || {
+        let mut rng = rand::rng();
+        #[allow(clippy::while_let_loop)]
+        loop {
+            let request = match request_receiver.recv() {
+                Ok(value) => value,
+                _ => break,
+            };
+
+            match request {
+                Request::New {
+                    configuration,
+                    grid_dimensions,
+                    target_room_count,
+                } => {
+                    let rooms = generate_rooms(
+                        &configuration,
+                        grid_dimensions,
+                        Some(target_room_count),
+                        &mut rng,
+                    );
+                    let triangulation = triangulate(grid_dimensions, rooms);
+                    let corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
+                    let grid = make_grid(&configuration, grid_dimensions, &corridors);
+                    if results_sender
+                        .send(Result::New {
+                            triangulation,
+                            corridors,
+                            grid,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Request::Corridors {
+                    configuration,
+                    grid_dimensions,
+                    triangulation,
+                } => {
+                    let corridors = pick_corridors(&configuration, triangulation, &mut rng);
+                    let grid = make_grid(&configuration, grid_dimensions, &corridors);
+                    if results_sender
+                        .send(Result::Corridors { corridors, grid })
+                        .is_err()
+                    {
+                        break;
+                    };
+                }
+            }
+        }
+    });
+
+    Generator {
+        requests,
+        results,
+        handle,
+    }
+}
+
 enum DrawOption {
     Grid,
     Corridors,
@@ -113,9 +212,7 @@ fn main() {
     let mut gui = RaylibGui::new(&mut rl, &thread);
     // ==============================
 
-
     // ============================== Configuration variables
-    let mut rng = rand::rng();
     let mut grid_width: usize = 100;
     let mut grid_height: usize = 100;
     let mut grid_dimensions = vec2u(grid_width, grid_height);
@@ -124,27 +221,42 @@ fn main() {
     let mut configuration = Configuration::default();
     // ============================== Configuration variables
 
-
     // ============================== State variables
-    let rooms = generate_rooms(
-        &configuration,
+    let mut generating = false;
+    let generator = make_generator();
+    // Generate a grid that won't take much time before the start of the application.
+    let request = Request::New {
+        configuration: configuration.clone(),
         grid_dimensions,
-        Some(target_room_count),
-        &mut rng,
-    );
-    let mut triangulation = triangulate(grid_dimensions, rooms);
-    let mut corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
+        target_room_count: 20,
+    };
+    if generator.requests.send(request).is_err() {
+        return;
+    }
+    let (mut triangulation, mut corridors, mut grid) = if let Ok(Result::New {
+        triangulation,
+        corridors,
+        grid,
+    }) = generator.results.recv()
+    {
+        (triangulation, corridors, grid)
+    } else {
+        return;
+    };
     let mut dimensions_changed: bool = false;
-    let mut image = Image::gen_image_color(
-        grid_dimensions.x as i32,
-        grid_dimensions.y as i32,
-        Color::BROWN,
-    );
-    draw_grid_to_image(&configuration, grid_dimensions, &corridors, &mut image);
+    let mut image = Image::gen_image_color(grid_width as i32, grid_height as i32, Color::BROWN);
+    draw_grid_to_image(&grid, &mut image);
     let mut texture = rl.load_texture_from_image(&thread, &image);
     let mut draw_option: DrawOption = DrawOption::Grid;
     // ============================== State variables
 
+    // ============================== Progress variables
+    let dot_delay: f32 = 0.75;
+    let mut dot_delay_timer: f32 = 0.0;
+    let max_dot_count: usize = 3;
+    let mut current_dot_mask: usize = 0;
+    let message = "generating...";
+    // ============================== Progress variables
 
     // ============================== Movement variables
     let mut scale: f32 = 5.0;
@@ -221,7 +333,7 @@ fn main() {
                     }
                 } // ============================== doorway_offset
 
-                
+
                 { // ============================== max_fail_count
                     ui.slider("Max Fail Count", 1, 200, &mut configuration.max_fail_count);
                     if ui.slider(
@@ -272,13 +384,13 @@ fn main() {
                     dimensions_changed |= ui.slider(
                         "Grid Width",
                         configuration.min_room_dimension + configuration.min_padding * 2,
-                        400,
+                        512,
                         &mut grid_width,
                     );
                     dimensions_changed |= ui.slider(
                         "Grid Height",
                         configuration.min_room_dimension + configuration.min_padding * 2,
-                        400,
+                        512,
                         &mut grid_height,
                     );
                     grid_dimensions = vec2u(grid_width, grid_height);
@@ -295,29 +407,29 @@ fn main() {
 
                 ui.label_text("Controls", CONTROLS);
 
+                let token = ui.begin_disabled(generating);
                 if ui.button("Regenerate") {
-                    if dimensions_changed {
-                        image.resize_nn(grid_width as i32, grid_height as i32);
-                        offset = view_center - grid_dimensions * scale / 2.0;
-                        dimensions_changed = false;
-                    }
-                    let rooms = generate_rooms(
-                        &configuration,
+                    generating = true;
+                    if generator.requests.send(Request::New {
+                        configuration: configuration.clone(),
                         grid_dimensions,
-                        Some(target_room_count),
-                        &mut rng,
-                    );
-                    triangulation = triangulate(grid_dimensions, rooms);
-                    corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
-                    draw_grid_to_image(&configuration, grid_dimensions, &corridors, &mut image);
-                    texture = rl.load_texture_from_image(&thread, &image);
+                        target_room_count
+                    }).is_err() {
+                        return;
+                    };
                 }
 
                 if ui.button("Regenerate Corridors") {
-                    corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
-                    draw_grid_to_image(&configuration, grid_dimensions, &corridors, &mut image);
-                    texture = rl.load_texture_from_image(&thread, &image);
+                    generating = true;
+                    if generator.requests.send(Request::Corridors {
+                        configuration: configuration.clone(),
+                        grid_dimensions,
+                        triangulation: triangulation.clone()
+                    }).is_err() {
+                        return;
+                    };
                 }
+                token.end();
 
                 use DrawOption::*;
                 ui.columns(3, "Views", false);
@@ -337,22 +449,25 @@ fn main() {
             });
         // ============================== User Interface
 
-        { // ============================== Input
-            if rl.is_key_pressed(KeyboardKey::KEY_R) {
-                let rooms = generate_rooms(
-                    &configuration,
-                    grid_dimensions,
-                    Some(target_room_count),
-                    &mut rng,
-                );
-                triangulation = triangulate(grid_dimensions, rooms);
-                corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
-                draw_grid_to_image(&configuration, grid_dimensions, &corridors, &mut image);
-                texture = rl.load_texture_from_image(&thread, &image);
-            }
+        // Delta time.
+        let dt = rl.get_frame_time();
 
-            // Delta time.
-            let dt = rl.get_frame_time();
+        // ============================== Input
+        {
+            if !generating && rl.is_key_pressed(KeyboardKey::KEY_R) {
+                generating = true;
+                if generator
+                    .requests
+                    .send(Request::New {
+                        configuration: configuration.clone(),
+                        grid_dimensions,
+                        target_room_count,
+                    })
+                    .is_err()
+                {
+                    break;
+                };
+            }
 
             if rl.is_key_pressed(KeyboardKey::KEY_C) {
                 scale = 5.0;
@@ -385,7 +500,46 @@ fn main() {
             if rl.is_key_down(KeyboardKey::KEY_L) {
                 offset.x -= scale * speed * dt;
             }
-        } // ============================== Input
+        }
+        // ============================== Input
+
+        match generator.results.try_recv() {
+            Ok(result) => {
+                match result {
+                    Result::New {
+                        triangulation: new_triangulation,
+                        corridors: new_corridors,
+                        grid: new_grid,
+                    } => {
+                        if dimensions_changed {
+                            image.resize_nn(grid_width as i32, grid_height as i32);
+                            offset = view_center - grid_dimensions * scale / 2.0;
+                            dimensions_changed = false;
+                        }
+                        triangulation = new_triangulation;
+                        corridors = new_corridors;
+                        grid = new_grid;
+                        draw_grid_to_image(&grid, &mut image);
+                        texture = rl.load_texture_from_image(&thread, &image);
+                    }
+                    Result::Corridors {
+                        corridors: new_corridors,
+                        grid: new_grid,
+                    } => {
+                        corridors = new_corridors;
+                        grid = new_grid;
+                        draw_grid_to_image(&grid, &mut image);
+                        texture = rl.load_texture_from_image(&thread, &image);
+                    }
+                }
+                generating = false;
+            }
+            Err(error) => {
+                if error == mpsc::TryRecvError::Disconnected {
+                    break;
+                }
+            }
+        }
 
         let mut draw_handle = rl.begin_drawing(&thread);
 
@@ -408,6 +562,33 @@ fn main() {
             ),
         };
 
+        if generating {
+            dot_delay_timer += dt;
+            if dot_delay_timer >= dot_delay {
+                dot_delay_timer = 0.0;
+                current_dot_mask += 1;
+                current_dot_mask %= max_dot_count;
+            }
+            draw_handle.draw_text(
+                &message[..message.len() - max_dot_count + current_dot_mask + 1],
+                20,
+                720 - 40,
+                20,
+                Color::WHITE,
+            );
+        } else {
+            dot_delay_timer = 0.0;
+            current_dot_mask = 0;
+        }
+
         gui.end();
     }
+
+    let Generator {
+        requests,
+        results,
+        handle,
+    } = generator;
+    drop((requests, results));
+    let _ = handle.join();
 }

@@ -87,7 +87,10 @@ pub fn a_star(
                 continue;
             }
             // If the path makes a square, this is an invalid neighbor.
-            if make_square(width, [neighbor, current, parent[current], parent[parent[current]]]) {
+            if make_square(
+                width,
+                [neighbor, current, parent[current], parent[parent[current]]],
+            ) {
                 continue;
             }
 

@@ -202,7 +202,7 @@ pub fn make_grid(
             return Grid {
                 width: grid_width,
                 tiles,
-            }
+            };
         }
 
         place_corridor(grid_width, &mut tiles, &path);
@@ -377,11 +377,14 @@ mod test {
             %#%_____%#%_____%#%\n\
             %#%%%%%%%#%%%%%%%#%\n\
             %#################%\n\
-            %%%%%%%%%%%%%%%%%%%\n"
+            %%%%%%%%%%%%%%%%%%%\n",
         );
 
         assert_eq!(grid.width, correct_grid.width, "Grids should match widths.");
-        assert_eq!(&grid.tiles, &correct_grid.tiles, "Grids should match contents.");
+        assert_eq!(
+            &grid.tiles, &correct_grid.tiles,
+            "Grids should match contents."
+        );
     }
 
     #[test]
@@ -425,10 +428,12 @@ mod test {
             %#%_____%#%_____%#%\n\
             %#%%%%%%%#%%%%%%%#%\n\
             %#################%\n\
-            %%%%%%%%%%%%%%%%%%%\n"
+            %%%%%%%%%%%%%%%%%%%\n",
         );
         assert_eq!(grid.width, final_grid.width, "Grids should match widths.");
-        assert_eq!(&grid.tiles, &final_grid.tiles, "Grids should match contents.");
+        assert_eq!(
+            &grid.tiles, &final_grid.tiles,
+            "Grids should match contents."
+        );
     }
-
 }

@@ -12,6 +12,7 @@ pub mod vec;
 #[cfg(test)]
 pub mod mock;
 
+#[derive(Clone, Debug)]
 pub struct Configuration {
     /// Minimum tile length of a room. Valid for both width and height.
     pub min_room_dimension: usize,
