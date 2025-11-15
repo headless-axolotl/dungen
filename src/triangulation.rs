@@ -135,14 +135,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> RoomGraph {
 mod test {
     use super::*;
     use crate::vec::vec2u;
-
-    /// Shorthand for creating a doorway.
-    fn doorway(x: usize, y: usize) -> Doorway {
-        Doorway {
-            room_index: 0,
-            position: vec2u(x, y),
-        }
-    }
+    use crate::mock::doorwayp;
 
     #[test]
     fn triangulation() {
@@ -150,7 +143,7 @@ mod test {
         let grid_dimensions = vec2u(100, 100);
         let rooms = Rooms {
             rooms: vec![],
-            doorways: vec![doorway(1, 1), doorway(2, 1), doorway(1, 2)],
+            doorways: vec![doorwayp(1, 1), doorwayp(2, 1), doorwayp(1, 2)],
         };
 
         let result = triangulate(grid_dimensions, rooms);
@@ -172,7 +165,7 @@ mod test {
         let grid_dimensions = vec2u(100, 100);
         let rooms = Rooms {
             rooms: vec![],
-            doorways: vec![doorway(1, 1), doorway(3, 1), doorway(1, 3), doorway(2, 2)],
+            doorways: vec![doorwayp(1, 1), doorwayp(3, 1), doorwayp(1, 3), doorwayp(2, 2)],
         };
 
         let result = triangulate(grid_dimensions, rooms);

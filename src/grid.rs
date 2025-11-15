@@ -199,7 +199,10 @@ pub fn make_grid(
         );
 
         if path.is_empty() {
-            unreachable!("There should always be a path between two doorways.");
+            return Grid {
+                width: grid_width,
+                tiles,
+            }
         }
 
         place_corridor(grid_width, &mut tiles, &path);
@@ -214,6 +217,11 @@ pub fn make_grid(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::{
+        mock::{doorway, room},
+        vec::{to_index, vec2u},
+    };
+
     #[test]
     fn tile_characters() {
         use Tile::*;
@@ -269,4 +277,136 @@ mod test {
             "Parsed grid does not match contents."
         );
     }
+
+    #[test]
+    fn corridor_placement() {
+        // This grid tests that the place_corridor procedure does not override blockers, rooms and
+        // doorways and already placed corridors. It tests whether the corridor neighbors are
+        // placed appropriatelly and whether blockers are placed in spots where we are certain a
+        // corridor should not be placed.
+        let Grid { width, mut tiles } = Grid::from(
+            "\
+            %%%%%%%%%%%%%\n\
+            %_%##@c@####%\n\
+            %_d##@c@####%\n\
+            %%%##@c@##%%%\n\
+            %####@c@##d_%\n\
+            %####@c@##%_%\n\
+            %%%%%%%%%%%%%\n",
+        );
+        let path = &[
+            to_index(vec2u(2, 2), width),
+            to_index(vec2u(3, 2), width),
+            to_index(vec2u(3, 3), width),
+            to_index(vec2u(3, 4), width),
+            to_index(vec2u(4, 4), width),
+            to_index(vec2u(5, 4), width),
+            to_index(vec2u(6, 4), width),
+            to_index(vec2u(7, 4), width),
+            to_index(vec2u(8, 4), width),
+            to_index(vec2u(9, 4), width),
+            to_index(vec2u(10, 4), width),
+        ];
+
+        place_corridor(width, &mut tiles, path);
+
+        let correct_grid = Grid::from(
+            "\
+            %%%%%%%%%%%%%\n\
+            %_%@#@c@####%\n\
+            %_dc@@c@####%\n\
+            %%%c%%c%@@%%%\n\
+            %#@cccccccd_%\n\
+            %##@@%c%@@%_%\n\
+            %%%%%%%%%%%%%\n",
+        );
+
+        assert_eq!(
+            &tiles, &correct_grid.tiles,
+            "Corridor placement is incorrect."
+        );
+    }
+
+    #[test]
+    fn grid_generation() {
+        // This test is mainly focused on the correct placement of rooms and doorways since A* and
+        // corridor placement already have been tested.
+        let configuration = Configuration::default();
+
+        let room_graph = RoomGraph {
+            rooms: vec![
+                room(3, 3, 5, 5),
+                room(11, 3, 5, 5),
+                room(3, 11, 5, 5),
+                room(11, 11, 5, 5),
+            ],
+            doorways: vec![
+                doorway(8, 5, 0),
+                doorway(5, 8, 0),
+                doorway(10, 5, 0),
+                doorway(13, 8, 0),
+                doorway(5, 10, 0),
+                doorway(8, 13, 0),
+                doorway(13, 10, 0),
+                doorway(10, 13, 0),
+            ],
+            edges: vec![(0, 2), (1, 4), (3, 6), (5, 7)],
+        };
+
+        let grid_dimension = configuration.min_padding * 3 + configuration.min_room_dimension * 2;
+        let grid_dimensions = vec2u(grid_dimension, grid_dimension);
+
+        let grid = make_grid(&configuration, grid_dimensions, &room_graph);
+        let correct_grid = Grid::from(
+            "\
+            %%%%%%%%%%%%%%%%%%%\n\
+            %#################%\n\
+            %#%%%%%%%#%%%%%%%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%@%_____%#%\n\
+            %#%_____dcd_____%#%\n\
+            %#%_____%@%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%%%d%%%#%%%d%%%#%\n\
+            %###@c@#####@c@###%\n\
+            %#%%%d%%%#%%%d%%%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%@%_____%#%\n\
+            %#%_____dcd_____%#%\n\
+            %#%_____%@%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%%%%%%%#%%%%%%%#%\n\
+            %#################%\n\
+            %%%%%%%%%%%%%%%%%%%\n"
+        );
+
+        assert_eq!(grid.width, correct_grid.width, "Grids should match widths.");
+        assert_eq!(&grid.tiles, &correct_grid.tiles, "Grids should match contents.");
+    }
+
+    #[test]
+    fn grid_generation_failure() {
+        // This can mainly happen if a doorway is misplaced or for some odd values
+        // for the A* costs.
+        let configuration = Configuration::default();
+        let room_graph = RoomGraph {
+            rooms: vec![
+                room(3, 3, 5, 5),
+                room(11, 3, 5, 5),
+                room(3, 11, 5, 5),
+                room(11, 11, 5, 5),
+            ],
+            doorways: vec![
+                doorway(8, 5, 0),
+                doorway(12, 4, 0), // Misplaced doorway.
+            ],
+            edges: vec![(0, 1)],
+        };
+        let grid_dimension = configuration.min_padding * 3 + configuration.min_room_dimension * 2;
+        let grid_dimensions = vec2u(grid_dimension, grid_dimension);
+        let grid = make_grid(&configuration, grid_dimensions, &room_graph);
+        assert_eq!(grid.width, 0, "Grid should have no width.");
+        assert!(grid.tiles.is_empty(), "Grid contents should be empty.");
+    }
+
 }

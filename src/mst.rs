@@ -134,7 +134,7 @@ pub fn pick_corridors<R: Rng>(
 mod test {
     use super::*;
     use crate::mock::MockRng;
-    use crate::vec::vec2u;
+    use crate::mock::doorway;
 
     #[test]
     fn new_disjoint_set() {
@@ -161,7 +161,7 @@ mod test {
         for set in sets {
             last = set[0];
             for &entity in *set {
-                disjoint_set.union_sets(last, entity);
+                disjoint_set.union_sets(entity, last);
                 last = entity;
             }
         }
@@ -190,13 +190,6 @@ mod test {
                     sets[j][0]
                 );
             }
-        }
-    }
-
-    fn doorway(x: usize, y: usize, room_index: usize) -> Doorway {
-        Doorway {
-            room_index,
-            position: vec2u(x, y),
         }
     }
 

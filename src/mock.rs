@@ -1,3 +1,26 @@
+use crate::room::{Doorway, Room};
+use crate::vec::vec2u;
+use raylib::math::Rectangle;
+
+// Shorthands:
+pub fn room(x: usize, y: usize, w: usize, h: usize) -> Room {
+    Room {
+        bounds: Rectangle::new(x as f32, y as f32, w as f32, h as f32),
+    }
+}
+pub fn doorway(x: usize, y: usize, room_index: usize) -> Doorway {
+    Doorway {
+        room_index,
+        position: vec2u(x, y),
+    }
+}
+pub fn doorwayp(x: usize, y: usize) -> Doorway {
+    Doorway {
+        room_index: 0,
+        position: vec2u(x, y),
+    }
+}
+
 pub struct MockMaxRng;
 impl crate::rng::Rng for MockMaxRng {
     fn random_range(&mut self, range: std::ops::RangeInclusive<usize>) -> usize {

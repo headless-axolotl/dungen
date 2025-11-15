@@ -12,6 +12,11 @@ fn manhattan(width: usize, a: usize, b: usize) -> usize {
     diff(a / width, b / width) + diff(a % width, b % width)
 }
 
+fn make_square(width: usize, mut nodes: [usize; 4]) -> bool {
+    nodes.sort();
+    nodes[0] + 1 == nodes[1] && nodes[0] + width == nodes[2] && nodes[0] + width + 1 == nodes[3]
+}
+
 /// A* pathfinding algorithm to carve corridors in the grid. It follows a couple of rules to
 /// guarantee that the corridors follow a specific shape. Since this procedure will be called
 /// multiple times, there is no need to allocate the needed structures more than once.
@@ -81,6 +86,10 @@ pub fn a_star(
             {
                 continue;
             }
+            // If the path makes a square, this is an invalid neighbor.
+            if make_square(width, [neighbor, current, parent[current], parent[parent[current]]]) {
+                continue;
+            }
 
             let cost = if matches!(tiles[neighbor], Corridor) {
                 corridor_cost
@@ -104,6 +113,8 @@ pub fn a_star(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::grid::Grid;
+    use crate::vec::{to_index, vec2u};
 
     #[test]
     fn unsigned_int_difference() {
@@ -123,5 +134,162 @@ mod test {
             row_b - row_a + col_a - col_b,
             "Manhattan distance is not correct."
         )
+    }
+
+    fn make_structures() -> (Heap<usize, usize>, Vec<usize>, Vec<usize>, Vec<usize>) {
+        (Heap::with_capacity(1000), vec![], vec![], vec![])
+    }
+
+    #[test]
+    #[should_panic]
+    fn grid_edge_should_be_unreachable() {
+        let configuration = Configuration::default();
+        let Grid { width, tiles } = Grid::from(
+            "\
+            #####\n\
+            ##%##\n\
+            #d%d#\n\
+            ##%##\n\
+            #####\n",
+        );
+        let start = to_index(vec2u(1, 2), width);
+        let end = to_index(vec2u(3, 2), width);
+        let (mut open_set, mut g_scores, mut parent, mut path) = make_structures();
+        a_star(
+            &configuration,
+            start,
+            end,
+            width,
+            &tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+    }
+
+    #[test]
+    fn no_path() {
+        let configuration = Configuration::default();
+        let Grid { width, tiles } = Grid::from(
+            "\
+            %%%%%\n\
+            %#%#%\n\
+            %d%d%\n\
+            %#%#%\n\
+            %%%%%\n",
+        );
+        let start = to_index(vec2u(1, 2), width);
+        let end = to_index(vec2u(3, 2), width);
+        println!("{:?}", tiles[start]);
+        println!("{:?}", tiles[start]);
+        let (mut open_set, mut g_scores, mut parent, mut path) = make_structures();
+        a_star(
+            &configuration,
+            start,
+            end,
+            width,
+            &tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+        assert_eq!(path.len(), 0, "A path was found when there was not one.");
+    }
+
+    #[test]
+    fn straight() {
+        let configuration = Configuration::default();
+        let Grid { width, tiles } = Grid::from(
+            "\
+            %%%%%%%%%%%\n\
+            %#########%\n\
+            %#########%\n\
+            %d#######d%\n\
+            %#########%\n\
+            %#########%\n\
+            %%%%%%%%%%%\n",
+        );
+        let start = to_index(vec2u(1, 3), width);
+        let end = to_index(vec2u(9, 3), width);
+        let (mut open_set, mut g_scores, mut parent, mut path) = make_structures();
+        a_star(
+            &configuration,
+            start,
+            end,
+            width,
+            &tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+        assert_eq!(path.len(), 9, "Path length was incorrect.");
+    }
+
+    #[test]
+    fn with_wall() {
+        let configuration = Configuration::default();
+        let Grid { width, tiles } = Grid::from(
+            "\
+            %%%%%%%%%%%\n\
+            %#########%\n\
+            %####%####%\n\
+            %d###%###d%\n\
+            %####%####%\n\
+            %####%####%\n\
+            %%%%%%%%%%%\n",
+        );
+        let start = to_index(vec2u(1, 3), width);
+        let end = to_index(vec2u(9, 3), width);
+        let (mut open_set, mut g_scores, mut parent, mut path) = make_structures();
+        a_star(
+            &configuration,
+            start,
+            end,
+            width,
+            &tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+        assert_eq!(path.len(), 13, "Path length was incorrect.");
+    }
+
+    #[test]
+    fn modified_costs() {
+        // The algorithm should now choose to go through the already placed corridor.
+        let configuration = Configuration {
+            straight_cost: 9,
+            standard_cost: 10,
+            ..Default::default()
+        };
+        let Grid { width, tiles } = Grid::from(
+            "\
+            %%%%%%%%%%%\n\
+            %#########%\n\
+            %#########%\n\
+            %d#######d%\n\
+            %##@@@@@##%\n\
+            %#@ccccc@#%\n\
+            %%%%%%%%%%%\n",
+        );
+        let start = to_index(vec2u(1, 3), width);
+        let end = to_index(vec2u(9, 3), width);
+        let (mut open_set, mut g_scores, mut parent, mut path) = make_structures();
+        a_star(
+            &configuration,
+            start,
+            end,
+            width,
+            &tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+        assert_eq!(path.len(), 13, "Path length was incorrect.");
     }
 }

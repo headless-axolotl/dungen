@@ -10,6 +10,8 @@ edition = "2024"
 # visualisations during development and simple
 # vector/rectangle operations
 raylib = { version = "5.5.1" }
+raylib_imgui = { version = "1.0.1" }
+imgui = { version = "0.12.0" }
 
 # pseudorandom number generation
 rand = { version = "0.9.2" }

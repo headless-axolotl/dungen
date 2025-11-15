@@ -12,8 +12,6 @@ pub mod vec;
 #[cfg(test)]
 pub mod mock;
 
-use std::marker::PhantomData;
-
 pub struct Configuration {
     /// Minimum tile length of a room. Valid for both width and height.
     pub min_room_dimension: usize,
@@ -25,7 +23,7 @@ pub struct Configuration {
     /// Offset from the edges of the room. Aesthetic option.
     pub doorway_offset: usize,
     /// The number of failed attempts to place a room before we abort the algorithm. The bigger the
-    /// number the higher the likelyhood that the target room count is reached. 
+    /// number the higher the likelyhood that the target room count is reached.
     pub max_fail_count: usize,
     /// What proportion of edges on average should be reintroduced as corridors i.e. (0) out of
     /// every (1).
@@ -39,23 +37,19 @@ pub struct Configuration {
     pub straight_cost: usize,
     /// Default cost for the A* algorithm. The corridors can move only horizontally or vertically.
     pub standard_cost: usize,
-    phantom: PhantomData<()>,
 }
 
 impl Configuration {
     pub fn is_valid(&self) -> bool {
-        if self.min_room_dimension < 5 { return false }
-        if self.min_room_dimension > self.max_room_dimension { return false }
-        if self.min_padding < 3 { return false }
-        if self.doorway_offset < 1 { return false }
-        if self.reintroduced_corridor_density.0 > self.reintroduced_corridor_density.1
-            || self.reintroduced_corridor_density.1 < 1 {
-            return false
-        }
-        if self.corridor_cost < 1 || self.straight_cost < 1 || self.standard_cost < 1 {
-            return false
-        }
-        true
+        self.min_room_dimension >= 5
+            && self.min_room_dimension <= self.max_room_dimension
+            && self.min_padding >= 3
+            && self.doorway_offset >= 1
+            && self.reintroduced_corridor_density.0 <= self.reintroduced_corridor_density.1
+            && self.reintroduced_corridor_density.1 >= 1
+            && self.corridor_cost >= 1
+            && self.straight_cost >= 1
+            && self.standard_cost >= 1
     }
 }
 
@@ -71,7 +65,6 @@ impl Default for Configuration {
             corridor_cost: 1,
             straight_cost: 2,
             standard_cost: 3,
-            phantom: Default::default(),
         }
     }
 }
