@@ -405,8 +405,30 @@ mod test {
         let grid_dimension = configuration.min_padding * 3 + configuration.min_room_dimension * 2;
         let grid_dimensions = vec2u(grid_dimension, grid_dimension);
         let grid = make_grid(&configuration, grid_dimensions, &room_graph);
-        assert_eq!(grid.width, 0, "Grid should have no width.");
-        assert!(grid.tiles.is_empty(), "Grid contents should be empty.");
+        let final_grid = Grid::from(
+            "\
+            %%%%%%%%%%%%%%%%%%%\n\
+            %#################%\n\
+            %#%%%%%%%#%%%%%%%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%#%_d___%#%\n\
+            %#%_____d#%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%%%%%%%#%%%%%%%#%\n\
+            %#################%\n\
+            %#%%%%%%%#%%%%%%%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%_____%#%_____%#%\n\
+            %#%%%%%%%#%%%%%%%#%\n\
+            %#################%\n\
+            %%%%%%%%%%%%%%%%%%%\n"
+        );
+        assert_eq!(grid.width, final_grid.width, "Grids should match widths.");
+        assert_eq!(&grid.tiles, &final_grid.tiles, "Grids should match contents.");
     }
 
 }
