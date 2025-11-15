@@ -217,6 +217,8 @@ fn main() {
     // ============================== Configuration variables
 
     // ============================== State variables
+    // Drawing on the render texture is flipped vertically, so we need to modify the source
+    // rectangle.
     let mut source_rectangle = Rectangle::new(
         0.0,
         (MAX_MAP_DIMENSIONS - grid_height) as f32,
@@ -511,7 +513,7 @@ fn main() {
         }
         // ============================== Input
 
-        //
+        // Try to receive a result from the generator and update the state variables.
         match generator.results.try_recv() {
             Ok(result) => {
                 match result {
@@ -558,6 +560,7 @@ fn main() {
             }
         }
 
+        // ============================== Drawing
         let mut draw_handle = rl.begin_drawing(&thread);
 
         draw_handle.clear_background(Color::BLACK);
@@ -590,6 +593,7 @@ fn main() {
             ),
         };
 
+        // ============================== Visual feedback for dungeon generation
         if generating {
             dot_delay_timer += dt;
             if dot_delay_timer >= dot_delay {
@@ -608,6 +612,10 @@ fn main() {
             dot_delay_timer = 0.0;
             current_dot_mask = 0;
         }
+        // ============================== Visual feedback for dungeon generation
+
+
+        // ============================== Drawing
 
         gui.end();
     }
