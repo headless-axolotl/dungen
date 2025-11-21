@@ -1,18 +1,20 @@
+mod ui;
+mod thread;
+
 use dungen::Configuration;
-use dungen::grid::{Grid, make_grid};
-use dungen::mst::pick_corridors;
-use dungen::room::{Doorway, Room, RoomGraph, generate_rooms};
-use dungen::triangulation::triangulate;
+use dungen::grid::Grid;
+use dungen::room::{Doorway, Room, RoomGraph};
 use dungen::vec::{vec2, vec2u};
 
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::thread::JoinHandle;
+use thread::{Request, Result, Generator};
+
+use std::sync::mpsc;
 
 use raylib::prelude::*;
 use raylib_imgui::RaylibGui;
 
 const CONTROLS: &str = "\
-[I, J, K, L] - up, left, down, right;
+[I, J, K, L] - up, left, down, right
 [U, O] - zoom in / out
 [C] - reset position & zoom
 [R] - generate new dungeon
@@ -57,8 +59,8 @@ fn draw_edges(
 ) {
     for edge in edges {
         draw_handle.draw_line_v(
-            offset + doorways[edge.0].position * scale + scale / 2.0,
-            offset + doorways[edge.1].position * scale + scale / 2.0,
+            offset + doorways[edge.0].position * scale + vec2(1.0, 1.0) * scale / 2.0,
+            offset + doorways[edge.1].position * scale + vec2(1.0, 1.0) * scale / 2.0,
             Color::LIME,
         );
     }
@@ -80,7 +82,7 @@ fn draw_graph(
 }
 
 #[cfg(not(tarpaulin_include))]
-fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw) {
+fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw, highlight_special: bool) {
     use dungen::grid::Tile::*;
     draw_handle.clear_background(Color::BROWN);
     for tile_index in 0..grid.tiles.len() {
@@ -89,115 +91,15 @@ fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw) {
         if matches!(grid.tiles[tile_index], Room | Corridor | Doorway) {
             draw_handle.draw_pixel(x, y, Color::YELLOW);
         }
-        // if matches!(grid.tiles[tile_index], Blocker) {
-        //     draw_handle.draw_pixel(x, y, Color::PURPLE);
-        // }
-        // if matches!(grid.tiles[tile_index], CorridorNeighbor) {
-        //     draw_handle.draw_pixel(x, y, Color::YELLOWGREEN);
-        // }
-    }
-}
-
-enum Request {
-    New {
-        configuration: Configuration,
-        grid_dimensions: Vector2,
-        target_room_count: usize,
-    },
-    Corridors {
-        configuration: Configuration,
-        grid_dimensions: Vector2,
-        triangulation: RoomGraph,
-    },
-}
-
-enum Result {
-    New {
-        triangulation: RoomGraph,
-        corridors: RoomGraph,
-        grid: Grid,
-    },
-    Corridors {
-        corridors: RoomGraph,
-        grid: Grid,
-    },
-}
-
-struct Generator {
-    requests: Sender<Request>,
-    results: Receiver<Result>,
-    handle: JoinHandle<()>,
-}
-
-#[cfg(not(tarpaulin_include))]
-fn make_generator() -> Generator {
-    let (requests, request_receiver) = mpsc::channel::<Request>();
-    let (results_sender, results) = mpsc::channel::<Result>();
-
-    let handle = std::thread::spawn(move || {
-        let mut rng = rand::rng();
-        #[allow(clippy::while_let_loop)]
-        loop {
-            let request = match request_receiver.recv() {
-                Ok(value) => value,
-                _ => break,
-            };
-
-            match request {
-                Request::New {
-                    configuration,
-                    grid_dimensions,
-                    target_room_count,
-                } => {
-                    let rooms = generate_rooms(
-                        &configuration,
-                        grid_dimensions,
-                        Some(target_room_count),
-                        &mut rng,
-                    );
-                    let triangulation = triangulate(grid_dimensions, rooms);
-                    let corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
-                    let grid = make_grid(&configuration, grid_dimensions, &corridors);
-                    if results_sender
-                        .send(Result::New {
-                            triangulation,
-                            corridors,
-                            grid,
-                        })
-                        .is_err()
-                    {
-                        break;
-                    }
-                }
-                Request::Corridors {
-                    configuration,
-                    grid_dimensions,
-                    triangulation,
-                } => {
-                    let corridors = pick_corridors(&configuration, triangulation, &mut rng);
-                    let grid = make_grid(&configuration, grid_dimensions, &corridors);
-                    if results_sender
-                        .send(Result::Corridors { corridors, grid })
-                        .is_err()
-                    {
-                        break;
-                    };
-                }
+        if highlight_special {
+            if matches!(grid.tiles[tile_index], Blocker) {
+                draw_handle.draw_pixel(x, y, Color::PURPLE);
+            }
+            if matches!(grid.tiles[tile_index], CorridorNeighbor) {
+                draw_handle.draw_pixel(x, y, Color::YELLOWGREEN);
             }
         }
-    });
-
-    Generator {
-        requests,
-        results,
-        handle,
     }
-}
-
-enum DrawOption {
-    Grid,
-    Corridors,
-    Triangulation,
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -234,7 +136,7 @@ fn main() {
         _ => return,
     };
     let mut generating = false;
-    let generator = make_generator();
+    let generator = thread::make_generator();
     // Generate a grid that won't take much time before the start of the application.
     let request = Request::New {
         configuration: configuration.clone(),
@@ -255,10 +157,10 @@ fn main() {
         return;
     };
     rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
-        draw_grid(&grid, &mut handle);
+        draw_grid(&grid, &mut handle, false);
     });
     let mut dimensions_changed: bool = false;
-    let mut draw_option: DrawOption = DrawOption::Grid;
+    let mut draw_option: ui::DrawOption = ui::DrawOption::Grid;
     // ============================== State variables
 
     // ============================== Progress variables
@@ -278,186 +180,19 @@ fn main() {
 
     while !rl.window_should_close() {
         let ui = gui.begin(&mut rl);
-
-        // ============================== User Interface
-        ui.window("Configuration")
-            .size([600.0, 500.0], imgui::Condition::Always)
-            .position([20.0, 20.0], imgui::Condition::Always)
-            .resizable(false)
-            .movable(false)
-            .build(|| {
-                { // ============================== min_room_dimension
-                    ui.slider(
-                        "Min Room Dimensions",
-                        5,
-                        100,
-                        &mut configuration.min_room_dimension,
-                    );
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "Minimum tile length of a room. Valid for both width and height.",
-                        );
-                    }
-                } // ============================== min_room_dimension
-
-
-                { // ============================== max_room_dimension
-                    configuration.max_room_dimension = configuration
-                        .max_room_dimension
-                        .max(configuration.min_room_dimension);
-                    ui.slider(
-                        "Max Room Dimensions",
-                        configuration.min_room_dimension,
-                        100,
-                        &mut configuration.max_room_dimension,
-                    );
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "Maximum tile length of a room. Must be greater than or equal to the minimum."
-                        );
-                    }
-                } // ============================== max_room_dimension
-
-
-                { // ============================== min_padding
-                    ui.slider("Min padding", 3, 20, &mut configuration.min_padding);
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "The minimum distance between rooms and the map border to guarantee that doorways \
-                             are accessible.");
-                    }
-                } // ============================== min_padding
-
-
-                { // ============================== doorway_offset
-                    configuration.doorway_offset = configuration
-                        .doorway_offset
-                        .min(configuration.min_room_dimension >> 1);
-                    ui.slider(
-                        "Doorway offset",
-                        1,
-                        configuration.min_room_dimension >> 1,
-                        &mut configuration.doorway_offset,
-                    );
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text("Offset from the edges of the room. Aesthetic option.");
-                    }
-                } // ============================== doorway_offset
-
-
-                { // ============================== max_fail_count
-                    ui.slider("Max Fail Count", 1, 200, &mut configuration.max_fail_count);
-                    if ui.slider(
-                        "Corridor Density",
-                        0.0,
-                        1.0,
-                        &mut reintroduced_corridor_density,
-                    ) {
-                        configuration.reintroduced_corridor_density =
-                            ((reintroduced_corridor_density * 1000.0) as usize, 1000);
-                    }
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "What percentage of edges from the triangulation on average \
-                             should be reintroduced as corridors.");
-                    }
-                } // ============================== max_fail_count
-
-                ui.spacing();
-
-                { // ============================== corridor costs
-                    ui.slider("Corridor Cost", 1, 40, &mut configuration.corridor_cost);
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "Cost for the A* algorithm when we go through an already \
-                             placed corridor. The relationship between this value and \
-                             the other two costs determines the shape of the corridors.");
-                    }
-                    ui.slider("Straight Cost", 1, 40, &mut configuration.straight_cost);
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "Cost for the A* algorithm when we go to a tile which is in the same \
-                             direction (horizontal or vertical) from which we came to the current \
-                             tile. When lower than the standard cost makes the corridors straight \
-                             hence the name.");
-                    }
-                    ui.slider("Standard Cost", 1, 40, &mut configuration.standard_cost);
-                    if ui.is_item_hovered() {
-                        ui.tooltip_text(
-                            "Default cost for the A* algorithm. The corridors can move \
-                             only horizontally or vertically.");
-                    }
-                } // ============================== corridor costs
-
-                ui.spacing();
-
-                { // ============================== grid dimensions
-                    dimensions_changed |= ui.slider(
-                        "Grid Width",
-                        configuration.min_room_dimension + configuration.min_padding * 2,
-                        MAX_MAP_DIMENSIONS,
-                        &mut grid_width,
-                    );
-                    dimensions_changed |= ui.slider(
-                        "Grid Height",
-                        configuration.min_room_dimension + configuration.min_padding * 2,
-                        MAX_MAP_DIMENSIONS,
-                        &mut grid_height,
-                    );
-                } // ============================== grid dimensions
-
-                let max_room_count = (grid_height * grid_width).min(MAX_ROOM_COUNT);
-                target_room_count = target_room_count.min(max_room_count);
-                ui.slider(
-                    "Target Room Count",
-                    1,
-                    max_room_count,
-                    &mut target_room_count,
-                );
-
-                ui.label_text("Controls", CONTROLS);
-
-                let token = ui.begin_disabled(generating);
-                if ui.button("Regenerate") {
-                    generating = true;
-                    if generator.requests.send(Request::New {
-                        configuration: configuration.clone(),
-                        grid_dimensions: vec2u(grid_width, grid_height),
-                        target_room_count
-                    }).is_err() {
-                        return;
-                    };
-                }
-
-                if ui.button("Regenerate Corridors") {
-                    generating = true;
-                    if generator.requests.send(Request::Corridors {
-                        configuration: configuration.clone(),
-                        grid_dimensions: vec2u(grid_width, grid_height),
-                        triangulation: triangulation.clone()
-                    }).is_err() {
-                        return;
-                    };
-                }
-                token.end();
-
-                use DrawOption::*;
-                ui.columns(3, "Views", false);
-                if ui.button("Grid") {
-                    draw_option = Grid;
-                }
-                ui.next_column();
-                if ui.button("Corridors") {
-                    draw_option = Corridors;
-                }
-                ui.next_column();
-                if ui.button("Triangulation") {
-                    draw_option = Triangulation;
-                }
-                ui.next_column();
-                ui.columns(1, "", false);
-            });
-        // ============================== User Interface
+        ui::draw_ui(
+            ui,
+            &mut configuration,
+            &mut reintroduced_corridor_density,
+            &mut dimensions_changed,
+            &mut draw_option,
+            &mut grid_width,
+            &mut grid_height,
+            &mut target_room_count,
+            &mut generating,
+            &generator,
+            &triangulation,
+        );
 
         // Delta time.
         let dt = rl.get_frame_time();
@@ -537,7 +272,7 @@ fn main() {
                         corridors = new_corridors;
                         grid = new_grid;
                         rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
-                            draw_grid(&grid, &mut handle);
+                            draw_grid(&grid, &mut handle, false);
                         });
                     }
                     Result::Corridors {
@@ -547,7 +282,7 @@ fn main() {
                         corridors = new_corridors;
                         grid = new_grid;
                         rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
-                            draw_grid(&grid, &mut handle);
+                            draw_grid(&grid, &mut handle, false);
                         });
                     }
                 }
@@ -565,7 +300,7 @@ fn main() {
 
         draw_handle.clear_background(Color::BLACK);
 
-        use DrawOption::*;
+        use ui::DrawOption::*;
         match draw_option {
             Grid => {
                 let destination_rectangle = Rectangle::new(
@@ -613,7 +348,6 @@ fn main() {
             current_dot_mask = 0;
         }
         // ============================== Visual feedback for dungeon generation
-
         // ============================== Drawing
 
         gui.end();

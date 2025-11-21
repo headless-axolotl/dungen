@@ -1,8 +1,9 @@
-use crate::{Configuration, rng::Rng, vec::vec2};
+use crate::{Configuration, rng::Rng};
+use crate::vec::vec2;
 
 use std::ops::RangeInclusive;
 
-use raylib::math::{Rectangle, Vector2};
+use raylib::math::{Vector2, Rectangle};
 
 const EAST: usize = 0;
 const NORTH: usize = 1;
