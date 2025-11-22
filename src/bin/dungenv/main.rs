@@ -1,12 +1,12 @@
-mod ui;
 mod thread;
+mod ui;
 
 use dungen::Configuration;
 use dungen::grid::Grid;
 use dungen::room::{Doorway, Room, RoomGraph};
 use dungen::vec::{vec2, vec2u};
 
-use thread::{Request, Result, Generator};
+use thread::{Generator, Request, Result};
 
 use std::sync::mpsc;
 
@@ -105,7 +105,9 @@ fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw, highlight_special: 
 #[cfg(not(tarpaulin_include))]
 fn main() {
     // ============================== Library variables
-    let (mut rl, thread) = raylib::init().size(1280, 720).title("Dungeon").build();
+
+    use ui::ExportResult;
+    let (mut rl, thread) = raylib::init().size(1280, 720).title("Dungeon Generator").build();
     let mut gui = RaylibGui::new(&mut rl, &thread);
     // ==============================
 
@@ -163,6 +165,12 @@ fn main() {
     let mut draw_option: ui::DrawOption = ui::DrawOption::Grid;
     // ============================== State variables
 
+    // ============================== Exporting
+    let mut export_path = String::new();
+    let mut export_result: ExportResult = Ok(());
+    let mut editing_text: bool = false;
+    // ============================== Exporting
+
     // ============================== Progress variables
     let dot_delay: f32 = 0.75;
     let mut dot_delay_timer: f32 = 0.0;
@@ -172,13 +180,14 @@ fn main() {
     // ============================== Progress variables
 
     // ============================== Movement variables
+    let scale_speed: f32 = 5.0;
     let mut scale: f32 = 5.0;
-    let speed: f32 = 20.0;
+    let speed: f32 = 10.0;
     let view_center: Vector2 = vec2(1280.0 * 3.0 / 4.0, 720.0 / 2.0);
     let mut offset: Vector2 = view_center - grid_dimensions * scale / 2.0;
     // ============================== Movement variables
 
-    while !rl.window_should_close() {
+    'main_thread: while !rl.window_should_close() {
         let ui = gui.begin(&mut rl);
         ui::draw_ui(
             ui,
@@ -190,6 +199,10 @@ fn main() {
             &mut grid_height,
             &mut target_room_count,
             &mut generating,
+            &mut export_path,
+            &mut export_result,
+            &mut editing_text,
+            &grid,
             &generator,
             &triangulation,
         );
@@ -198,7 +211,11 @@ fn main() {
         let dt = rl.get_frame_time();
 
         // ============================== Input
-        {
+        'input: {
+            if editing_text {
+                break 'input;
+            }
+
             if !generating && rl.is_key_pressed(KeyboardKey::KEY_R) {
                 generating = true;
                 if generator
@@ -210,7 +227,7 @@ fn main() {
                     })
                     .is_err()
                 {
-                    break;
+                    break 'main_thread;
                 };
             }
 
@@ -221,29 +238,30 @@ fn main() {
 
             if rl.is_key_down(KeyboardKey::KEY_U) {
                 let previous_scale = scale;
-                scale += 10.0 * dt;
+                scale += scale * scale_speed * dt;
                 offset = (offset - view_center) * scale / previous_scale + view_center;
             }
             if rl.is_key_down(KeyboardKey::KEY_O) {
                 let previous_scale = scale;
-                scale -= 10.0 * dt;
+                scale -= scale * scale_speed * dt;
                 if scale < 2.0 {
                     scale = 2.0;
                 }
                 offset = (offset - view_center) * scale / previous_scale + view_center;
             }
 
+            let step = scale * speed * speed * dt;
             if rl.is_key_down(KeyboardKey::KEY_I) {
-                offset.y += scale * speed * dt;
+                offset.y += step;
             }
             if rl.is_key_down(KeyboardKey::KEY_K) {
-                offset.y -= scale * speed * dt;
+                offset.y -= step;
             }
             if rl.is_key_down(KeyboardKey::KEY_J) {
-                offset.x += scale * speed * dt;
+                offset.x += step;
             }
             if rl.is_key_down(KeyboardKey::KEY_L) {
-                offset.x -= scale * speed * dt;
+                offset.x -= step;
             }
         }
         // ============================== Input
@@ -258,8 +276,8 @@ fn main() {
                         grid: new_grid,
                     } => {
                         if dimensions_changed {
-                            offset = view_center - grid_dimensions * scale / 2.0;
                             grid_dimensions = vec2u(grid_width, grid_height);
+                            offset = view_center - grid_dimensions * scale / 2.0;
                             source_rectangle = Rectangle::new(
                                 0.0,
                                 MAX_MAP_DIMENSIONS as f32 - grid_dimensions.y,

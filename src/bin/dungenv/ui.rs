@@ -1,8 +1,11 @@
-use crate::{Generator, Request};
 use crate::{CONTROLS, MAX_MAP_DIMENSIONS, MAX_ROOM_COUNT};
+use crate::{Generator, Request};
+use dungen::Configuration;
+use dungen::grid::Grid;
 use dungen::room::RoomGraph;
 use dungen::vec::vec2u;
-use dungen::Configuration;
+
+pub type ExportResult = Result<(), &'static str>;
 
 pub enum DrawOption {
     Grid,
@@ -10,7 +13,24 @@ pub enum DrawOption {
     Triangulation,
 }
 
+#[cfg(not(tarpaulin_include))]
+fn try_export_grid(grid: &Grid, path: &str) -> ExportResult {
+    if let Ok(exists) = std::fs::exists(path) {
+        if exists {
+            return Err("File already exists.");
+        }
+    } else {
+        return Err("File system error.");
+    }
+    if std::fs::write(path, format!("{}", grid)).is_ok() {
+        Ok(())
+    } else {
+        Err("File system error.")
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
+#[cfg(not(tarpaulin_include))]
 pub fn draw_ui(
     ui: &mut imgui::Ui,
     configuration: &mut Configuration,
@@ -21,9 +41,14 @@ pub fn draw_ui(
     grid_height: &mut usize,
     target_room_count: &mut usize,
     generating: &mut bool,
+    export_path: &mut String,
+    export_result: &mut ExportResult,
+    editing_text: &mut bool,
+    grid: &Grid,
     generator: &Generator,
-    triangulation: &RoomGraph
+    triangulation: &RoomGraph,
 ) {
+    *editing_text = false;
     // ============================== User Interface
     ui.window("Configuration")
         .size([600.0, 500.0], imgui::Condition::Always)
@@ -163,6 +188,37 @@ pub fn draw_ui(
             ui.label_text("Controls", CONTROLS);
 
             let token = ui.begin_disabled(*generating);
+
+            // ============================== Exporting
+            ui.columns(2, "Exporting", false);
+            ui.input_text("Export path", export_path).build();
+            if ui.is_item_active() || ui.is_item_edited() {
+                *editing_text = true;
+            }
+            ui.next_column();
+            if ui.button("Export") {
+                *export_result = try_export_grid(grid, export_path);
+                ui.open_popup("Export Message");
+            }
+            ui.columns(1, "", false);
+
+            if let Some(_token) = ui.modal_popup_config("Export Message")
+                .save_settings(false)
+                .always_auto_resize(true)
+                .resizable(false)
+                .begin_popup()
+            {
+                if let Err(message) = export_result {
+                    ui.text(message);
+                } else {
+                    ui.text("Exported successfully.");
+                }
+                if ui.button("ok") {
+                    ui.close_current_popup();
+                }
+            }
+            // ============================== Exporting
+
             if ui.button("Regenerate") {
                 *generating = true;
                 if generator.requests.send(Request::New {
