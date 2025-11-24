@@ -108,13 +108,12 @@ conditions are tested such as reaching the maximum number of failures allowed.
 
 ### Triangulation
 
-Two simple unit tests are performed here. One checks whether the procedure
-correctly constructs a triangle from three points and the other whether the
-procedure correctly constructs two triagnles from four points. By extension
-these tests also check whether the helper points which are placed around the
-rectangle of the map and any edges connected to them are removed from the list.
-
-TBA: bigger unit test.
+Two simple and one bigger unit tests are performed here. The first simple test
+checks whether the procedure correctly constructs a triangle from three points
+and the other whether the procedure correctly constructs two triagnles from four
+points. By extension these tests also check whether the helper points which are
+placed around the rectangle of the map and any edges connected to them are
+removed from the list. The bigger test checks the triangulation of more points.
 
 ### Vector operations
 

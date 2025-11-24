@@ -6,7 +6,7 @@ use std::collections::HashSet;
 use raylib::math::Vector2;
 
 /// Makes edges with consistent point ordering.
-fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
+pub fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
     (point_a.min(point_b), point_a.max(point_b))
 }
 
@@ -173,18 +173,72 @@ mod test {
             ],
         };
 
-        let result = triangulate(grid_dimensions, rooms);
+        let mut result = triangulate(grid_dimensions, rooms);
         assert_eq!(
             result.edges.len(),
             5,
             "There should be exactly 2 triangles and exactly 5 edges."
         );
 
-        for edge in &[(0, 1), (0, 2), (1, 3), (2, 3), (0, 3)] {
-            assert!(
-                result.edges.contains(edge),
-                "The result does not contain all the correct edges."
-            );
-        }
+        let mut actual_edges = [(0, 1), (0, 2), (1, 3), (2, 3), (0, 3)];
+        actual_edges.sort();
+        result.edges.sort();
+
+        assert_eq!(
+            &result.edges, &actual_edges,
+            "The result does not contain all the correct edges."
+        );
+    }
+
+    #[test]
+    fn triangulation_many_vertices() {
+        let grid_dimensions = vec2u(100, 100);
+        let rooms = Rooms {
+            rooms: vec![],
+            doorways: vec![
+                doorwayp(1, 1),
+                doorwayp(3, 1),
+                doorwayp(6, 2),
+                doorwayp(3, 3),
+                doorwayp(5, 3),
+                doorwayp(1, 4),
+                doorwayp(7, 4),
+                doorwayp(4, 5),
+                doorwayp(2, 7),
+                doorwayp(5, 7),
+            ],
+        };
+
+        let mut result = triangulate(grid_dimensions, rooms);
+        result.edges.sort();
+
+        let mut actual_edges = [
+            (0, 1),
+            (0, 3),
+            (0, 5),
+            (1, 2),
+            (1, 3),
+            (1, 4),
+            (2, 4),
+            (2, 6),
+            (3, 4),
+            (3, 5),
+            (3, 7),
+            (4, 6),
+            (4, 7),
+            (5, 7),
+            (5, 8),
+            (6, 7),
+            (6, 9),
+            (7, 8),
+            (7, 9),
+            (8, 9),
+        ];
+        actual_edges.sort();
+
+        assert_eq!(
+            &result.edges, &actual_edges,
+            "The result does not contain all the correct edges."
+        )
     }
 }

@@ -11,15 +11,21 @@ const WEST: usize = 2;
 const SOUTH: usize = 3;
 
 /// Structure representing a rectangular room in the grid.
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Room {
     pub bounds: Rectangle,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Doorway {
     pub room_index: usize,
     pub position: Vector2,
+}
+
+impl From<Doorway> for Vector2 {
+    fn from(value: Doorway) -> Self {
+        value.position
+    }
 }
 
 #[derive(Debug)]

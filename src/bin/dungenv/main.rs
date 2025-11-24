@@ -92,6 +92,9 @@ fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw, highlight_special: 
             draw_handle.draw_pixel(x, y, Color::YELLOW);
         }
         if highlight_special {
+            if matches!(grid.tiles[tile_index], Doorway) {
+                draw_handle.draw_pixel(x, y, Color::BLUEVIOLET);
+            }
             if matches!(grid.tiles[tile_index], Blocker) {
                 draw_handle.draw_pixel(x, y, Color::PURPLE);
             }

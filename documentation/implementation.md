@@ -130,12 +130,11 @@ does not support updating the keys of the nodes. Due to the heuristic
 duplicates, although not a problem since their presence can be detected, will
 not be inserted in the priority queue.
 
-More extreme cost values sometimes make the pathfinding algorithm fail.
+More extreme cost values sometimes make the pathfinding algorithm fail. In that
+case we regenerate the corridors with default cost settings.
 
 TBA:
-- regenerate dungeon with default settings, when failure to generate a
-corridor occurs.
-- maze generator in specific rooms.
+- maze generation in specific rooms.
 
 ### GUI application
 

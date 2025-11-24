@@ -1,8 +1,4 @@
-use crate::{
-    Configuration,
-    rng::Rng,
-    room::{Doorway, RoomGraph},
-};
+use crate::{Configuration, rng::Rng, room::RoomGraph};
 
 #[derive(Debug)]
 pub struct DisjointSet {
@@ -48,14 +44,17 @@ impl DisjointSet {
 
 /// Employs Kruskal's algorithm to find a minimum spanning tree of the triangulation. Returns the
 /// indices of edges which are part of the minimum spanning tree.
-pub fn minimum_spanning_tree(doorways: &[Doorway], edges: &mut [(usize, usize)]) -> Vec<usize> {
+pub fn minimum_spanning_tree<P: Clone + Into<raylib::math::Vector2>>(
+    points: &[P],
+    edges: &mut [(usize, usize)],
+) -> Vec<usize> {
     let mut edge_indices: Vec<usize> = vec![];
 
     edges.sort_by_key(|edge| {
-        (doorways[edge.0].position - doorways[edge.1].position).length_sqr() as usize
+        (points[edge.0].clone().into() - points[edge.1].clone().into()).length_sqr() as usize
     });
 
-    let mut disjoint_set = DisjointSet::new(doorways.len());
+    let mut disjoint_set = DisjointSet::new(points.len());
     for (edge_index, edge) in edges.iter().enumerate() {
         if disjoint_set.find_set(edge.0) == disjoint_set.find_set(edge.1) {
             continue;
@@ -135,6 +134,7 @@ mod test {
     use super::*;
     use crate::mock::MockRng;
     use crate::mock::doorway;
+    use crate::vec::vec2u;
 
     #[test]
     fn new_disjoint_set() {
@@ -195,10 +195,10 @@ mod test {
 
     #[test]
     fn correct_minimum_spanning_tree() {
-        let doorways = &[doorway(1, 1, 0), doorway(4, 1, 0), doorway(1, 3, 0)];
+        let points = &[vec2u(1, 1), vec2u(4, 1), vec2u(1, 3)];
         let edges = &mut [(0, 1), (1, 2), (0, 2)];
 
-        let result = minimum_spanning_tree(doorways, edges);
+        let result = minimum_spanning_tree(points, edges);
         assert_eq!(
             &result,
             &[0, 1],
@@ -213,7 +213,7 @@ mod test {
 
         // The order of the edges should not matter.
         let edges = &mut [(0, 2), (0, 1), (1, 2)];
-        let result = minimum_spanning_tree(doorways, edges);
+        let result = minimum_spanning_tree(points, edges);
         assert_eq!(
             &result,
             &[0, 1],
@@ -225,6 +225,88 @@ mod test {
             &[(0, 2), (0, 1), (1, 2)],
             "The order of the edges is incorrect."
         );
+    }
+
+    use rand::distr::Distribution;
+    use raylib::math::Vector2;
+
+    /// Uses Prim's algorithm on a full graph to find the minimum spanning tree. Returns the
+    /// points, the full graph and the MST in order to test Kruskal's algorithm.
+    #[allow(clippy::type_complexity)]
+    fn minimum_spanning_tree_prim(
+        vertex_count: usize,
+    ) -> (Vec<Vector2>, Vec<(usize, usize)>, Vec<(usize, usize)>) {
+        let uniform = rand::distr::Uniform::new(0, 1000).unwrap();
+        let mut rng = rand::rng();
+
+        let mut points: Vec<Vector2> = Vec::with_capacity(vertex_count);
+        let mut edge_list: Vec<(usize, usize)> =
+            Vec::with_capacity((vertex_count * (vertex_count + 1)) / 2);
+        let mut mst: Vec<(usize, usize)> = Vec::with_capacity(vertex_count - 1);
+        for vertex in 0..vertex_count {
+            points.push(vec2u(uniform.sample(&mut rng), uniform.sample(&mut rng)));
+            for previous in 0..vertex_count {
+                edge_list.push((vertex, previous));
+            }
+        }
+
+        let mut in_tree = vec![false; vertex_count];
+        // Pairs of (distance, parent_index).
+        let mut min_edge = vec![(usize::MAX, usize::MAX); vertex_count];
+        min_edge[0] = (0, usize::MAX);
+        let mut next;
+        let mut distance;
+        for _ in 0..vertex_count {
+            next = vertex_count;
+            for vertex in 0..vertex_count {
+                if !in_tree[vertex]
+                    && (next == vertex_count || min_edge[vertex].0 < min_edge[next].0)
+                {
+                    next = vertex;
+                }
+            }
+
+            if next == vertex_count {
+                break;
+            }
+
+            in_tree[next] = true;
+            if min_edge[next].1 != usize::MAX {
+                mst.push(crate::triangulation::make_edge(next, min_edge[next].1));
+            }
+
+            for to in 0..vertex_count {
+                distance = (points[next] - points[to]).length_sqr() as usize;
+                if distance < min_edge[to].0 {
+                    min_edge[to] = (distance, next);
+                }
+            }
+        }
+
+        mst.sort_by_key(|edge| {
+            (points[edge.0] - points[edge.1]).length_sqr() as usize
+        });
+
+        (points, edge_list, mst)
+    }
+
+    fn test_kruskal_with_prim(vertex_count: usize) {
+        let (points, mut edges, mst_prim) = minimum_spanning_tree_prim(vertex_count);
+        let mst_kruskal_indices = minimum_spanning_tree(&points, &mut edges);
+        let mst_kruskal = mst_kruskal_indices.iter().map(|index| edges[*index]).collect::<Vec<_>>();
+        assert_eq!(mst_prim.len(), mst_kruskal.len(), "Minimum spanning trees should match.");
+        for i in 0..mst_prim.len() {
+            let length_prim = (points[mst_prim[i].0] - points[mst_prim[i].1]).length_sqr();
+            let length_kruskal = (points[mst_kruskal[i].0] - points[mst_kruskal[i].1]).length_sqr();
+            assert_eq!(length_prim, length_kruskal, "Minimum spanning trees should match.");
+        }
+    }
+    
+    #[test]
+    fn kruskal_with_prim_tests() {
+        test_kruskal_with_prim(10);
+        test_kruskal_with_prim(100);
+        test_kruskal_with_prim(1000);
     }
 
     #[test]

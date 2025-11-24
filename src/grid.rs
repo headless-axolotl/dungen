@@ -106,11 +106,13 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
             tiles[index] = Blocker;
         } else if matches!(tiles[index], Wall) {
             tiles[index] = CorridorNeighbor;
+        } else if matches!(tiles[index], Room) {
+            tiles[index] = Doorway;
         }
     }
 
     // The first and the last tiles in the path are doorways.
-    for &current in &path[1..] {
+    for &current in path {
         if !matches!(tiles[current], Corridor) {
             place_corridor_neighbor(current + 1, tiles);
             place_corridor_neighbor(current - 1, tiles);
@@ -180,38 +182,77 @@ pub fn make_grid(
     let mut parent: Vec<usize> = vec![];
     let mut path: Vec<usize> = vec![];
 
-    // Place doorways (which replace blocking tiles around the rooms) and create corridors.
+    let mut tiles_clone = tiles.clone();
+    if try_carve_corridors(
+        configuration,
+        room_graph,
+        grid_width,
+        &mut tiles_clone,
+        &mut open_set,
+        &mut g_scores,
+        &mut parent,
+        &mut path,
+    ) {
+        Grid {
+            width: grid_width,
+            tiles: tiles_clone,
+        }
+    } else {
+        try_carve_corridors(
+            &Default::default(),
+            room_graph,
+            grid_width,
+            &mut tiles,
+            &mut open_set,
+            &mut g_scores,
+            &mut parent,
+            &mut path,
+        );
+        Grid {
+            width: grid_width,
+            tiles,
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn try_carve_corridors(
+    configuration: &Configuration,
+    room_graph: &RoomGraph,
+    width: usize,
+    tiles: &mut [Tile],
+    open_set: &mut Heap<usize, usize>,
+    g_scores: &mut Vec<usize>,
+    parent: &mut Vec<usize>,
+    path: &mut Vec<usize>,
+) -> bool {
+    use Tile::*;
     for edge in &room_graph.edges {
-        let position_a = to_index(room_graph.doorways[edge.0].position, grid_width);
-        let position_b = to_index(room_graph.doorways[edge.1].position, grid_width);
+        let position_a = to_index(room_graph.doorways[edge.0].position, width);
+        let position_b = to_index(room_graph.doorways[edge.1].position, width);
+        // Place doorways (which replace blocking tiles around the rooms) and create corridors.
         tiles[position_a] = Doorway;
         tiles[position_b] = Doorway;
         a_star(
             configuration,
             position_a,
             position_b,
-            grid_width,
-            &tiles,
-            &mut open_set,
-            &mut g_scores,
-            &mut parent,
-            &mut path,
+            width,
+            tiles,
+            open_set,
+            g_scores,
+            parent,
+            path,
         );
 
         if path.is_empty() {
-            return Grid {
-                width: grid_width,
-                tiles,
-            };
+            return false;
         }
 
-        place_corridor(grid_width, &mut tiles, &path);
+        place_corridor(width, tiles, path);
     }
 
-    Grid {
-        width: grid_width,
-        tiles,
-    }
+    true
 }
 
 #[cfg(test)]
@@ -314,9 +355,9 @@ mod test {
             "\
             %%%%%%%%%%%%%\n\
             %_%@#@c@####%\n\
-            %_dc@@c@####%\n\
+            %ddc@@c@####%\n\
             %%%c%%c%@@%%%\n\
-            %#@cccccccd_%\n\
+            %#@cccccccdd%\n\
             %##@@%c%@@%_%\n\
             %%%%%%%%%%%%%\n",
         );
@@ -364,15 +405,15 @@ mod test {
             %#%%%%%%%#%%%%%%%#%\n\
             %#%_____%#%_____%#%\n\
             %#%_____%@%_____%#%\n\
-            %#%_____dcd_____%#%\n\
+            %#%____ddcdd____%#%\n\
             %#%_____%@%_____%#%\n\
-            %#%_____%#%_____%#%\n\
+            %#%__d__%#%__d__%#%\n\
             %#%%%d%%%#%%%d%%%#%\n\
             %###@c@#####@c@###%\n\
             %#%%%d%%%#%%%d%%%#%\n\
-            %#%_____%#%_____%#%\n\
+            %#%__d__%#%__d__%#%\n\
             %#%_____%@%_____%#%\n\
-            %#%_____dcd_____%#%\n\
+            %#%____ddcdd____%#%\n\
             %#%_____%@%_____%#%\n\
             %#%_____%#%_____%#%\n\
             %#%%%%%%%#%%%%%%%#%\n\
@@ -383,56 +424,6 @@ mod test {
         assert_eq!(grid.width, correct_grid.width, "Grids should match widths.");
         assert_eq!(
             &grid.tiles, &correct_grid.tiles,
-            "Grids should match contents."
-        );
-    }
-
-    #[test]
-    fn grid_generation_failure() {
-        // This can mainly happen if a doorway is misplaced or for some odd values
-        // for the A* costs.
-        let configuration = Configuration::default();
-        let room_graph = RoomGraph {
-            rooms: vec![
-                room(3, 3, 5, 5),
-                room(11, 3, 5, 5),
-                room(3, 11, 5, 5),
-                room(11, 11, 5, 5),
-            ],
-            doorways: vec![
-                doorway(8, 5, 0),
-                doorway(12, 4, 0), // Misplaced doorway.
-            ],
-            edges: vec![(0, 1)],
-        };
-        let grid_dimension = configuration.min_padding * 3 + configuration.min_room_dimension * 2;
-        let grid_dimensions = vec2u(grid_dimension, grid_dimension);
-        let grid = make_grid(&configuration, grid_dimensions, &room_graph);
-        let final_grid = Grid::from(
-            "\
-            %%%%%%%%%%%%%%%%%%%\n\
-            %#################%\n\
-            %#%%%%%%%#%%%%%%%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%_____%#%_d___%#%\n\
-            %#%_____d#%_____%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%%%%%%%#%%%%%%%#%\n\
-            %#################%\n\
-            %#%%%%%%%#%%%%%%%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%_____%#%_____%#%\n\
-            %#%%%%%%%#%%%%%%%#%\n\
-            %#################%\n\
-            %%%%%%%%%%%%%%%%%%%\n",
-        );
-        assert_eq!(grid.width, final_grid.width, "Grids should match widths.");
-        assert_eq!(
-            &grid.tiles, &final_grid.tiles,
             "Grids should match contents."
         );
     }
