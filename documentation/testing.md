@@ -114,6 +114,8 @@ procedure correctly constructs two triagnles from four points. By extension
 these tests also check whether the helper points which are placed around the
 rectangle of the map and any edges connected to them are removed from the list.
 
+TBA: bigger unit test.
+
 ### Vector operations
 
 There are two procedures that are tested here. The first is the procedure which
@@ -124,4 +126,8 @@ and performing square roots for efficiency's sake.
 
 The second procedure tetsed is a simple conversion from the 2D vector structure
 to an index in a flattened matrix array. This test is more of a sanity check.
+
+### Manual testing
+
+Using the visualisation tools more extreme configuration values were tested.
 

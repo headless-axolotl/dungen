@@ -132,6 +132,11 @@ not be inserted in the priority queue.
 
 More extreme cost values sometimes make the pathfinding algorithm fail.
 
+TBA:
+- regenerate dungeon with default settings, when failure to generate a
+corridor occurs.
+- maze generator in specific rooms.
+
 ### GUI application
 
 The GUI application uses raylib and imgui to draw the generated dungeon and a
