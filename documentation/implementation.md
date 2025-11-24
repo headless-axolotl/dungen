@@ -161,3 +161,7 @@ parallel two tiles away and still be able to cross them perpendicularly.
 The source for the complexity analysis is Wikipedia. Individual articles are
 listed in the specification document.
 
+## LLM Report
+
+No LLMs were used in the making of this project.
+
