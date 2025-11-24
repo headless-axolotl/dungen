@@ -130,11 +130,7 @@ does not support updating the keys of the nodes. Due to the heuristic
 duplicates, although not a problem since their presence can be detected, will
 not be inserted in the priority queue.
 
-More extreme cost values sometimes make the pathfinding algorithm fail. This,
-although not thoroughly checked, usually happens after the corridors which were
-part of the MST are already carved giving high likelyhood that all of the rooms
-are still connected after the premature termination of the grid generation
-algorithm.
+More extreme cost values sometimes make the pathfinding algorithm fail.
 
 ### GUI application
 
