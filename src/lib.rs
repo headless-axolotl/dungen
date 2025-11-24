@@ -39,7 +39,7 @@ pub struct Configuration {
     pub straight_cost: usize,
     /// Default cost for the A* algorithm. The corridors can move only horizontally or vertically.
     pub standard_cost: usize,
-    pub min_maze_dimensions: usize,
+    pub min_maze_dimension: usize,
     pub maze_chance: f32,
 }
 
@@ -54,7 +54,7 @@ impl Configuration {
             && self.corridor_cost >= 1
             && self.straight_cost >= 1
             && self.standard_cost >= 1
-            && self.min_maze_dimensions >= 5
+            && self.min_maze_dimension >= 5
             && 0.0 <= self.maze_chance
             && self.maze_chance <= 1.0
     }
@@ -72,7 +72,7 @@ impl Default for Configuration {
             corridor_cost: 1,
             straight_cost: 2,
             standard_cost: 3,
-            min_maze_dimensions: 5,
+            min_maze_dimension: 5,
             maze_chance: 0.1,
         }
     }

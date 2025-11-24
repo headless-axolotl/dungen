@@ -107,6 +107,8 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
         } else if matches!(tiles[index], Wall) {
             tiles[index] = CorridorNeighbor;
         } else if matches!(tiles[index], Room) {
+            // Place a doorway marker tile inside the room to help the maze generation algorithm
+            // procedure.
             tiles[index] = Doorway;
         }
     }
@@ -124,6 +126,43 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
             tiles[current] = Corridor;
         }
     }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn try_place_corridors(
+    configuration: &Configuration,
+    room_graph: &RoomGraph,
+    width: usize,
+    tiles: &mut [Tile],
+    open_set: &mut Heap<usize, usize>,
+    g_scores: &mut Vec<usize>,
+    parent: &mut Vec<usize>,
+    path: &mut Vec<usize>,
+) -> bool {
+    use Tile::*;
+    for edge in &room_graph.edges {
+        let position_a = to_index(room_graph.doorways[edge.0].position, width);
+        let position_b = to_index(room_graph.doorways[edge.1].position, width);
+        // Place doorways (which replace blocking tiles around the rooms) and create corridors.
+        tiles[position_a] = Doorway;
+        tiles[position_b] = Doorway;
+        a_star(
+            configuration,
+            position_a,
+            position_b,
+            width,
+            tiles,
+            open_set,
+            g_scores,
+            parent,
+            path,
+        );
+        if path.is_empty() {
+            return false;
+        }
+        place_corridor(width, tiles, path);
+    }
+    true
 }
 
 /// Takes a room graph and creates the corresponding grid given the options in the configuration
@@ -183,7 +222,7 @@ pub fn make_grid(
     let mut path: Vec<usize> = vec![];
 
     let mut tiles_clone = tiles.clone();
-    if try_carve_corridors(
+    if try_place_corridors(
         configuration,
         room_graph,
         grid_width,
@@ -198,7 +237,7 @@ pub fn make_grid(
             tiles: tiles_clone,
         }
     } else {
-        try_carve_corridors(
+        try_place_corridors(
             &Default::default(),
             room_graph,
             grid_width,
@@ -213,46 +252,6 @@ pub fn make_grid(
             tiles,
         }
     }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn try_carve_corridors(
-    configuration: &Configuration,
-    room_graph: &RoomGraph,
-    width: usize,
-    tiles: &mut [Tile],
-    open_set: &mut Heap<usize, usize>,
-    g_scores: &mut Vec<usize>,
-    parent: &mut Vec<usize>,
-    path: &mut Vec<usize>,
-) -> bool {
-    use Tile::*;
-    for edge in &room_graph.edges {
-        let position_a = to_index(room_graph.doorways[edge.0].position, width);
-        let position_b = to_index(room_graph.doorways[edge.1].position, width);
-        // Place doorways (which replace blocking tiles around the rooms) and create corridors.
-        tiles[position_a] = Doorway;
-        tiles[position_b] = Doorway;
-        a_star(
-            configuration,
-            position_a,
-            position_b,
-            width,
-            tiles,
-            open_set,
-            g_scores,
-            parent,
-            path,
-        );
-
-        if path.is_empty() {
-            return false;
-        }
-
-        place_corridor(width, tiles, path);
-    }
-
-    true
 }
 
 #[cfg(test)]

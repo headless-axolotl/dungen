@@ -110,7 +110,10 @@ fn main() {
     // ============================== Library variables
 
     use ui::ExportResult;
-    let (mut rl, thread) = raylib::init().size(1280, 720).title("Dungeon Generator").build();
+    let (mut rl, thread) = raylib::init()
+        .size(1280, 720)
+        .title("Dungeon Generator")
+        .build();
     let mut gui = RaylibGui::new(&mut rl, &thread);
     // ==============================
 
@@ -161,8 +164,9 @@ fn main() {
     } else {
         return;
     };
+    let highlight_special = false;
     rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
-        draw_grid(&grid, &mut handle, false);
+        draw_grid(&grid, &mut handle, highlight_special);
     });
     let mut dimensions_changed: bool = false;
     let mut draw_option: ui::DrawOption = ui::DrawOption::Grid;
@@ -293,7 +297,7 @@ fn main() {
                         corridors = new_corridors;
                         grid = new_grid;
                         rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
-                            draw_grid(&grid, &mut handle, false);
+                            draw_grid(&grid, &mut handle, highlight_special);
                         });
                     }
                     Result::Corridors {
@@ -303,7 +307,7 @@ fn main() {
                         corridors = new_corridors;
                         grid = new_grid;
                         rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
-                            draw_grid(&grid, &mut handle, false);
+                            draw_grid(&grid, &mut handle, highlight_special);
                         });
                     }
                 }

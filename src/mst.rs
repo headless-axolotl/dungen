@@ -283,9 +283,7 @@ mod test {
             }
         }
 
-        mst.sort_by_key(|edge| {
-            (points[edge.0] - points[edge.1]).length_sqr() as usize
-        });
+        mst.sort_by_key(|edge| (points[edge.0] - points[edge.1]).length_sqr() as usize);
 
         (points, edge_list, mst)
     }
@@ -293,15 +291,25 @@ mod test {
     fn test_kruskal_with_prim(vertex_count: usize) {
         let (points, mut edges, mst_prim) = minimum_spanning_tree_prim(vertex_count);
         let mst_kruskal_indices = minimum_spanning_tree(&points, &mut edges);
-        let mst_kruskal = mst_kruskal_indices.iter().map(|index| edges[*index]).collect::<Vec<_>>();
-        assert_eq!(mst_prim.len(), mst_kruskal.len(), "Minimum spanning trees should match.");
+        let mst_kruskal = mst_kruskal_indices
+            .iter()
+            .map(|index| edges[*index])
+            .collect::<Vec<_>>();
+        assert_eq!(
+            mst_prim.len(),
+            mst_kruskal.len(),
+            "Minimum spanning trees should match."
+        );
         for i in 0..mst_prim.len() {
             let length_prim = (points[mst_prim[i].0] - points[mst_prim[i].1]).length_sqr();
             let length_kruskal = (points[mst_kruskal[i].0] - points[mst_kruskal[i].1]).length_sqr();
-            assert_eq!(length_prim, length_kruskal, "Minimum spanning trees should match.");
+            assert_eq!(
+                length_prim, length_kruskal,
+                "Minimum spanning trees should match."
+            );
         }
     }
-    
+
     #[test]
     fn kruskal_with_prim_tests() {
         test_kruskal_with_prim(10);

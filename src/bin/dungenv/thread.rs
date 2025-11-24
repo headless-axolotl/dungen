@@ -1,5 +1,6 @@
 use dungen::Configuration;
 use dungen::grid::Grid;
+use dungen::maze;
 use dungen::room::RoomGraph;
 
 use std::sync::mpsc::{self, Receiver, Sender};
@@ -70,7 +71,8 @@ pub fn make_generator() -> Generator {
                     );
                     let triangulation = triangulate(grid_dimensions, rooms);
                     let corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
-                    let grid = make_grid(&configuration, grid_dimensions, &corridors);
+                    let mut grid = make_grid(&configuration, grid_dimensions, &corridors);
+                    maze::make_mazes(&mut rng, &configuration, &mut grid, &corridors);
                     if results_sender
                         .send(Result::New {
                             triangulation,
@@ -88,7 +90,8 @@ pub fn make_generator() -> Generator {
                     triangulation,
                 } => {
                     let corridors = pick_corridors(&configuration, triangulation, &mut rng);
-                    let grid = make_grid(&configuration, grid_dimensions, &corridors);
+                    let mut grid = make_grid(&configuration, grid_dimensions, &corridors);
+                    maze::make_mazes(&mut rng, &configuration, &mut grid, &corridors);
                     if results_sender
                         .send(Result::Corridors { corridors, grid })
                         .is_err()

@@ -51,7 +51,7 @@ pub fn draw_ui(
     *editing_text = false;
     // ============================== User Interface
     ui.window("Configuration")
-        .size([600.0, 500.0], imgui::Condition::Always)
+        .size([600.0, 600.0], imgui::Condition::Always)
         .position([20.0, 20.0], imgui::Condition::Always)
         .resizable(false)
         .movable(false)
@@ -184,6 +184,31 @@ pub fn draw_ui(
                 max_room_count,
                 target_room_count,
             );
+
+            ui.spacing();
+
+            { // ============================== maze options
+                configuration.min_maze_dimension = configuration.min_maze_dimension
+                    .max(configuration.min_room_dimension)
+                    .min(configuration.max_room_dimension);
+                ui.slider(
+                    "Min Maze Dimensions",
+                    configuration.min_room_dimension,
+                    configuration.max_room_dimension,
+                    &mut configuration.min_maze_dimension
+                );
+                ui.slider(
+                    "Maze Chance",
+                    0.0,
+                    1.0,
+                    &mut configuration.maze_chance,
+                );
+                if ui.is_item_hovered() {
+                    ui.tooltip_text(
+                        "What percentage of rooms with the given minimum dimesions \
+                         should have mazes generated in them.");
+                }
+            } // ============================== max_fail_count
 
             ui.label_text("Controls", CONTROLS);
 
