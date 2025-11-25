@@ -10,6 +10,7 @@ use rand::seq::SliceRandom;
 
 /// Uses the Disjoint Set structure to construct a maze in a room in a similar fassion to
 /// [this article](https://en.wikipedia.org/wiki/Maze_generation_algorithm#Iterative_randomized_Kruskal's_algorithm_(with_sets)).
+#[cfg(not(tarpaulin_include))]
 pub fn place_maze<R: Rng>(rng: &mut R, room: &Room, grid: &mut Grid) {
     let northwest_corner = vec::to_index(vec::vec2(room.bounds.x, room.bounds.y), grid.width);
     let room_width = room.bounds.width as usize;
@@ -115,6 +116,7 @@ pub fn place_maze<R: Rng>(rng: &mut R, room: &Room, grid: &mut Grid) {
     }
 }
 
+#[cfg(not(tarpaulin_include))]
 pub fn make_mazes<R: Rng>(
     rng: &mut R,
     configuration: &Configuration,

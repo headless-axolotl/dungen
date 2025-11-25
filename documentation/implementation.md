@@ -133,8 +133,13 @@ not be inserted in the priority queue.
 More extreme cost values sometimes make the pathfinding algorithm fail. In that
 case we regenerate the corridors with default cost settings.
 
-TBA:
-- maze generation in specific rooms.
+### Maze generation
+
+In this step we attempt to generate a maze using a Spanning Tree method as
+described
+[here](https://en.wikipedia.org/wiki/Maze_generation_algorithm#Iterative_randomized_Kruskal's_algorithm_(with_sets)).
+The configuration contains values which determine the proportion of rooms of
+suitable size in which the procedure will generate a maze.
 
 ### GUI application
 

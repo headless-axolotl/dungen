@@ -15,7 +15,7 @@ Unit tests which test the functionality of a given module live in the same file
 as that module. They are in the submodule `test` which is marked by
 `#[cfg(test)]`.
 
-As of the last commit the coverage is: 97.73%.
+As of the last commit the coverage is: 95.91%.
 
 ## Methodology
 
@@ -128,5 +128,7 @@ to an index in a flattened matrix array. This test is more of a sanity check.
 
 ### Manual testing
 
-Using the visualisation tools more extreme configuration values were tested.
+Using the visualisation tools more extreme configuration values were tested. In
+addition, more of the significant bugs were easier to detect visually using the
+GUI application.
 
