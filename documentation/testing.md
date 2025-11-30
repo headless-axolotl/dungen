@@ -130,5 +130,5 @@ to an index in a flattened matrix array. This test is more of a sanity check.
 
 Using the visualisation tools more extreme configuration values were tested. In
 addition, more of the significant bugs were easier to detect visually using the
-GUI application.
+GUI application. The maze generation was tested manually.
 

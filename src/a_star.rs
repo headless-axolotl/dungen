@@ -57,7 +57,12 @@ pub fn a_star(
     g_scores[start] = 0;
     open_set.insert(manhattan(width, start, end) * min_cost, start);
 
-    while let Some((_, mut current)) = open_set.extract_min() {
+    while let Some((f_cost, mut current)) = open_set.extract_min() {
+        let g_cost = f_cost - manhattan(width, current, end) * min_cost;
+        if g_cost > g_scores[current] {
+            continue;
+        }
+
         if current == end {
             path.push(current);
             while current != parent[current] {

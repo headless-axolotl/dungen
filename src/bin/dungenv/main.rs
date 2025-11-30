@@ -3,10 +3,10 @@ mod ui;
 
 use dungen::Configuration;
 use dungen::grid::Grid;
-use dungen::room::{Doorway, Room, RoomGraph};
-use dungen::vec::{vec2, vec2u};
+use dungen::room::{Doorway, Dungeon, Room};
 
 use thread::{Generator, Request, Result};
+use ui::ExportResult;
 
 use std::sync::mpsc;
 
@@ -24,11 +24,25 @@ const CONTROLS: &str = "\
 const MAX_ROOM_COUNT: usize = 2_000;
 const MAX_MAP_DIMENSIONS: usize = 512;
 
+// Shorthands for raylib::math::Vector2
+#[cfg(not(tarpaulin_include))]
+fn vec2(x: f32, y: f32) -> Vector2 {
+    Vector2::new(x, y)
+}
+#[cfg(not(tarpaulin_include))]
+fn vec2u(x: usize, y: usize) -> Vector2 {
+    Vector2::new(x as f32, y as f32)
+}
+#[cfg(not(tarpaulin_include))]
+fn cast2f(vector: dungen::vec::Vector2) -> Vector2 {
+    Vector2::new(vector.x as f32, vector.y as f32)
+}
+
 #[cfg(not(tarpaulin_include))]
 fn draw_rooms(scale: f32, offset: Vector2, draw_handle: &mut impl RaylibDraw, rooms: &[Room]) {
     for room in rooms {
-        let room_corner = offset + vec2(room.bounds.x, room.bounds.y) * scale;
-        let room_dimensions = vec2(room.bounds.width, room.bounds.height) * scale;
+        let room_corner = offset + vec2u(room.bounds.x, room.bounds.y) * scale;
+        let room_dimensions = vec2u(room.bounds.width, room.bounds.height) * scale;
         draw_handle.draw_rectangle_v(room_corner, room_dimensions, Color::PURPLE);
     }
 }
@@ -42,7 +56,7 @@ fn draw_doorways(
 ) {
     for doorway in doorways {
         draw_handle.draw_rectangle_v(
-            offset + doorway.position * scale,
+            offset + cast2f(doorway.position) * scale,
             vec2(scale, scale),
             Color::BLUE,
         );
@@ -59,8 +73,8 @@ fn draw_edges(
 ) {
     for edge in edges {
         draw_handle.draw_line_v(
-            offset + doorways[edge.0].position * scale + vec2(1.0, 1.0) * scale / 2.0,
-            offset + doorways[edge.1].position * scale + vec2(1.0, 1.0) * scale / 2.0,
+            offset + cast2f(doorways[edge.0].position) * scale + vec2(1.0, 1.0) * scale / 2.0,
+            offset + cast2f(doorways[edge.1].position) * scale + vec2(1.0, 1.0) * scale / 2.0,
             Color::LIME,
         );
     }
@@ -72,13 +86,14 @@ fn draw_graph(
     offset: Vector2,
     grid_dimensions: Vector2,
     draw_handle: &mut impl RaylibDraw,
-    graph: &RoomGraph,
+    dungeon: &Dungeon,
+    edges: &[(usize, usize)],
 ) {
     draw_handle.draw_rectangle_v(offset, grid_dimensions * scale, Color::GRAY);
 
-    draw_rooms(scale, offset, draw_handle, &graph.rooms);
-    draw_doorways(scale, offset, draw_handle, &graph.doorways);
-    draw_edges(scale, offset, draw_handle, &graph.doorways, &graph.edges);
+    draw_rooms(scale, offset, draw_handle, &dungeon.rooms);
+    draw_doorways(scale, offset, draw_handle, &dungeon.doorways);
+    draw_edges(scale, offset, draw_handle, &dungeon.doorways, edges);
 }
 
 #[cfg(not(tarpaulin_include))]
@@ -108,8 +123,6 @@ fn draw_grid(grid: &Grid, draw_handle: &mut impl RaylibDraw, highlight_special: 
 #[cfg(not(tarpaulin_include))]
 fn main() {
     // ============================== Library variables
-
-    use ui::ExportResult;
     let (mut rl, thread) = raylib::init()
         .size(1280, 720)
         .title("Dungeon Generator")
@@ -120,7 +133,7 @@ fn main() {
     // ============================== Configuration variables
     let mut grid_width: usize = 100;
     let mut grid_height: usize = 100;
-    let mut grid_dimensions = vec2u(grid_width, grid_height);
+    let mut grid_dimensions = dungen::vec::vec2u(grid_width, grid_height);
     let mut target_room_count: usize = 30;
     let mut reintroduced_corridor_density: f32 = 0.5;
     let mut configuration = Configuration::default();
@@ -154,13 +167,14 @@ fn main() {
     if generator.requests.send(request).is_err() {
         return;
     }
-    let (mut triangulation, mut corridors, mut grid) = if let Ok(Result::New {
+    let (mut rooms, mut triangulation, mut corridors, mut grid) = if let Ok(Result::New {
+        dungeon: rooms,
         triangulation,
         corridors,
         grid,
     }) = generator.results.recv()
     {
-        (triangulation, corridors, grid)
+        (rooms, triangulation, corridors, grid)
     } else {
         return;
     };
@@ -191,7 +205,7 @@ fn main() {
     let mut scale: f32 = 5.0;
     let speed: f32 = 10.0;
     let view_center: Vector2 = vec2(1280.0 * 3.0 / 4.0, 720.0 / 2.0);
-    let mut offset: Vector2 = view_center - grid_dimensions * scale / 2.0;
+    let mut offset: Vector2 = view_center - cast2f(grid_dimensions) * scale / 2.0;
     // ============================== Movement variables
 
     'main_thread: while !rl.window_should_close() {
@@ -211,6 +225,7 @@ fn main() {
             &mut editing_text,
             &grid,
             &generator,
+            &rooms,
             &triangulation,
         );
 
@@ -229,7 +244,7 @@ fn main() {
                     .requests
                     .send(Request::New {
                         configuration: configuration.clone(),
-                        grid_dimensions: vec2u(grid_width, grid_height),
+                        grid_dimensions: dungen::vec::vec2u(grid_width, grid_height),
                         target_room_count,
                     })
                     .is_err()
@@ -240,7 +255,7 @@ fn main() {
 
             if rl.is_key_pressed(KeyboardKey::KEY_C) {
                 scale = 5.0;
-                offset = view_center - grid_dimensions * scale / 2.0;
+                offset = view_center - cast2f(grid_dimensions) * scale / 2.0;
             }
 
             if rl.is_key_down(KeyboardKey::KEY_U) {
@@ -278,21 +293,23 @@ fn main() {
             Ok(result) => {
                 match result {
                     Result::New {
+                        dungeon: new_rooms,
                         triangulation: new_triangulation,
                         corridors: new_corridors,
                         grid: new_grid,
                     } => {
                         if dimensions_changed {
-                            grid_dimensions = vec2u(grid_width, grid_height);
-                            offset = view_center - grid_dimensions * scale / 2.0;
+                            grid_dimensions = dungen::vec::vec2u(grid_width, grid_height);
+                            offset = view_center - cast2f(grid_dimensions) * scale / 2.0;
                             source_rectangle = Rectangle::new(
                                 0.0,
-                                MAX_MAP_DIMENSIONS as f32 - grid_dimensions.y,
-                                grid_dimensions.x,
-                                -grid_dimensions.y,
+                                MAX_MAP_DIMENSIONS as f32 - grid_dimensions.y as f32,
+                                grid_dimensions.x as f32,
+                                -grid_dimensions.y as f32,
                             );
                             dimensions_changed = false;
                         }
+                        rooms = new_rooms;
                         triangulation = new_triangulation;
                         corridors = new_corridors;
                         grid = new_grid;
@@ -331,8 +348,8 @@ fn main() {
                 let destination_rectangle = Rectangle::new(
                     offset.x,
                     offset.y,
-                    grid_dimensions.x * scale,
-                    grid_dimensions.y * scale,
+                    grid_dimensions.x as f32 * scale,
+                    grid_dimensions.y as f32 * scale,
                 );
                 draw_handle.draw_texture_pro(
                     &render_texture,
@@ -343,12 +360,20 @@ fn main() {
                     Color::WHITE,
                 );
             }
-            Corridors => draw_graph(scale, offset, grid_dimensions, &mut draw_handle, &corridors),
+            Corridors => draw_graph(
+                scale,
+                offset,
+                cast2f(grid_dimensions),
+                &mut draw_handle,
+                &rooms,
+                &corridors,
+            ),
             Triangulation => draw_graph(
                 scale,
                 offset,
-                grid_dimensions,
+                cast2f(grid_dimensions),
                 &mut draw_handle,
+                &rooms,
                 &triangulation,
             ),
         };

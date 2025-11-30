@@ -1,4 +1,9 @@
-use crate::{Configuration, rng::Rng, room::RoomGraph};
+use crate::vec;
+use crate::{
+    Configuration,
+    rng::Rng,
+    room::{Dungeon, Edges},
+};
 
 #[derive(Debug)]
 pub struct DisjointSet {
@@ -44,7 +49,7 @@ impl DisjointSet {
 
 /// Employs Kruskal's algorithm to find a minimum spanning tree of the triangulation. Returns the
 /// indices of edges which are part of the minimum spanning tree.
-pub fn minimum_spanning_tree<P: Clone + Into<raylib::math::Vector2>>(
+pub fn minimum_spanning_tree<P: Clone + Into<vec::Vector2>>(
     points: &[P],
     edges: &mut [(usize, usize)],
 ) -> Vec<usize> {
@@ -70,22 +75,19 @@ pub fn minimum_spanning_tree<P: Clone + Into<raylib::math::Vector2>>(
 /// the edges of the triangulation back.
 pub fn pick_corridors<R: Rng>(
     configuration: &Configuration,
-    triangulation: RoomGraph,
+    dungeon: &Dungeon,
+    triangulation: &mut Edges,
     rng: &mut R,
-) -> RoomGraph {
-    let RoomGraph {
-        rooms,
-        doorways,
-        mut edges,
-    } = triangulation;
+) -> Edges {
+    let Dungeon { rooms: _, doorways } = dungeon;
 
-    let tree = minimum_spanning_tree(&doorways, &mut edges);
+    let tree = minimum_spanning_tree(doorways, triangulation);
 
     // Find the edges which are not part of the minimum spanning tree.
     // Since the indices in the tree array are sorted we can do this in O(n) as such.
     let mut residual_edges: Vec<usize> = vec![];
     let mut tree_edge_index: usize = 0;
-    for edge_index in 0..edges.len() {
+    for edge_index in 0..triangulation.len() {
         if tree_edge_index < tree.len() && edge_index == tree[tree_edge_index] {
             tree_edge_index += 1;
             continue;
@@ -99,7 +101,7 @@ pub fn pick_corridors<R: Rng>(
     // doorways of different rooms to the corridor array.
     let mut edge: (usize, usize);
     for edge_index in tree {
-        edge = edges[edge_index];
+        edge = triangulation[edge_index];
         if doorways[edge.0].room_index != doorways[edge.1].room_index {
             corridors.push(edge);
         }
@@ -112,7 +114,7 @@ pub fn pick_corridors<R: Rng>(
     // Randomly add edges not in the minimum spanning tree which connect
     // doorways of different rooms to the corridor array.
     for residual_edge_index in residual_edges {
-        edge = edges[residual_edge_index];
+        edge = triangulation[residual_edge_index];
         if doorways[edge.0].room_index == doorways[edge.1].room_index {
             continue;
         }
@@ -122,11 +124,7 @@ pub fn pick_corridors<R: Rng>(
         }
     }
 
-    RoomGraph {
-        rooms,
-        doorways,
-        edges: corridors,
-    }
+    corridors
 }
 
 #[cfg(test)]
@@ -227,8 +225,8 @@ mod test {
         );
     }
 
+    use crate::vec::Vector2;
     use rand::distr::Distribution;
-    use raylib::math::Vector2;
 
     /// Uses Prim's algorithm on a full graph to find the minimum spanning tree. Returns the
     /// points, the full graph and the MST in order to test Kruskal's algorithm.
@@ -323,7 +321,7 @@ mod test {
             reintroduced_corridor_density: (2, 2),
             ..Default::default()
         };
-        let triangulation = RoomGraph {
+        let dungeon = Dungeon {
             rooms: vec![],
             doorways: vec![
                 doorway(1, 1, 0),
@@ -331,13 +329,14 @@ mod test {
                 doorway(1, 3, 0),
                 doorway(4, 3, 0),
             ],
-            edges: vec![(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)],
         };
+        let mut triangulation = vec![(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)];
+
         let mut mock_rng = MockRng::new(vec![1]);
-        let result = pick_corridors(&configuration, triangulation, &mut mock_rng);
+        let corridors = pick_corridors(&configuration, &dungeon, &mut triangulation, &mut mock_rng);
 
         assert_eq!(
-            result.edges.len(),
+            corridors.len(),
             0,
             "Since all doorways belong to a single room there should be no corridors picked."
         );
@@ -349,7 +348,7 @@ mod test {
             reintroduced_corridor_density: (0, 1),
             ..Default::default()
         };
-        let triangulation = RoomGraph {
+        let dungeon = Dungeon {
             rooms: vec![],
             doorways: vec![
                 doorway(1, 1, 1),
@@ -357,22 +356,26 @@ mod test {
                 doorway(1, 3, 3),
                 doorway(4, 3, 4),
             ],
-            edges: vec![(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)],
         };
+        let mut triangulation = vec![(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)];
+
         let mut mock_rng = MockRng::new(vec![1]);
-        let result = pick_corridors(&configuration, triangulation, &mut mock_rng);
+        let mut corridors =
+            pick_corridors(&configuration, &dungeon, &mut triangulation, &mut mock_rng);
 
         assert_eq!(
-            result.edges.len(),
+            corridors.len(),
             3,
             "There should be exactly 3 edges in the picked corridors."
         );
-        for edge in &[(0, 2), (0, 1), (1, 3)] {
-            assert!(
-                result.edges.contains(edge),
-                "A correct edge is missing from the picked edges."
-            );
-        }
+
+        let mut correct_corridors = [(0, 2), (0, 1), (1, 3)];
+        correct_corridors.sort();
+        corridors.sort();
+        assert_eq!(
+            &corridors, &correct_corridors,
+            "A correct edge is missing from the picked edges."
+        );
     }
 
     #[test]
@@ -381,7 +384,7 @@ mod test {
             reintroduced_corridor_density: (1, 1),
             ..Default::default()
         };
-        let triangulation = RoomGraph {
+        let dungeon = Dungeon {
             rooms: vec![],
             doorways: vec![
                 doorway(1, 1, 1),
@@ -389,13 +392,13 @@ mod test {
                 doorway(1, 3, 3),
                 doorway(4, 3, 4),
             ],
-            edges: vec![(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)],
         };
+        let mut triangulation = vec![(0, 1), (0, 2), (1, 2), (1, 3), (2, 3)];
         let mut mock_rng = MockRng::new(vec![1]);
-        let result = pick_corridors(&configuration, triangulation, &mut mock_rng);
+        let corridors = pick_corridors(&configuration, &dungeon, &mut triangulation, &mut mock_rng);
 
         assert_eq!(
-            result.edges.len(),
+            corridors.len(),
             5,
             "There should be exactly 5 edges in the picked corridors."
         );

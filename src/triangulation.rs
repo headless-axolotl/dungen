@@ -1,9 +1,7 @@
-use crate::room::{Doorway, RoomGraph, Rooms};
-use crate::vec::{point_in_circumcircle, vec2};
+use crate::room::{Doorway, Dungeon, Edges};
+use crate::vec::{self, Vector2};
 
 use std::collections::HashSet;
-
-use raylib::math::Vector2;
 
 /// Makes edges with consistent point ordering.
 pub fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
@@ -12,26 +10,23 @@ pub fn make_edge(point_a: usize, point_b: usize) -> (usize, usize) {
 
 /// Employs the Bowyer-Watson algorithm to create a Delaynay triangulation
 /// between the doorways of the rooms.
-pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> RoomGraph {
-    let Rooms {
-        rooms,
-        mut doorways,
-    } = rooms;
+pub fn triangulate(grid_dimensions: Vector2, rooms: &mut Dungeon) -> Edges {
+    let Dungeon { rooms, doorways } = rooms;
 
     // The last three doorways belong to the super_triangle.
     let none_room_index = rooms.len();
     // Create a right triangle, which covers the whole grid.
     doorways.push(Doorway {
         room_index: none_room_index,
-        position: vec2(-1.0, -1.0),
+        position: vec::vec2(-1, -1),
     });
     doorways.push(Doorway {
         room_index: none_room_index,
-        position: vec2(-1.0, 2.0 * grid_dimensions.y + 1.0),
+        position: vec::vec2(-1, 2 * grid_dimensions.y + 1),
     });
     doorways.push(Doorway {
         room_index: none_room_index,
-        position: vec2(2.0 * grid_dimensions.x + 1.0, -1.0),
+        position: vec::vec2(2 * grid_dimensions.x + 1, -1),
     });
 
     let super_triangle_first_point_index = doorways.len() - 3;
@@ -49,7 +44,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> RoomGraph {
     for (point_index, point) in doorways[..doorways.len() - 3].iter().enumerate() {
         bad_triangles.clear();
         for (triangle_index, triangle) in triangles.iter().enumerate() {
-            let point_is_in_circumcircle = point_in_circumcircle(
+            let point_is_in_circumcircle = vec::point_in_circumcircle(
                 point.position,
                 doorways[triangle.0].position,
                 doorways[triangle.1].position,
@@ -124,11 +119,7 @@ pub fn triangulate(grid_dimensions: Vector2, rooms: Rooms) -> RoomGraph {
         polygon.insert(make_edge(triangle.1, triangle.2));
     }
 
-    RoomGraph {
-        rooms,
-        doorways,
-        edges: polygon.drain().collect(),
-    }
+    polygon.drain().collect()
 }
 
 #[cfg(test)]
@@ -141,20 +132,20 @@ mod test {
     fn triangulation() {
         // For this test we do not need the room boundaries.
         let grid_dimensions = vec2u(100, 100);
-        let rooms = Rooms {
+        let mut rooms = Dungeon {
             rooms: vec![],
             doorways: vec![doorwayp(1, 1), doorwayp(2, 1), doorwayp(1, 2)],
         };
 
-        let result = triangulate(grid_dimensions, rooms);
+        let edges = triangulate(grid_dimensions, &mut rooms);
         assert_eq!(
-            result.edges.len(),
+            edges.len(),
             3,
             "There should be exactly 1 triangle and exactly 3 edges."
         );
         for edge in &[(0, 1), (1, 2), (0, 2)] {
             assert!(
-                result.edges.contains(edge),
+                edges.contains(edge),
                 "The result does not contain all the correct edges."
             );
         }
@@ -163,7 +154,7 @@ mod test {
     #[test]
     fn triangulation_with_more_vertices() {
         let grid_dimensions = vec2u(100, 100);
-        let rooms = Rooms {
+        let mut rooms = Dungeon {
             rooms: vec![],
             doorways: vec![
                 doorwayp(1, 1),
@@ -173,19 +164,19 @@ mod test {
             ],
         };
 
-        let mut result = triangulate(grid_dimensions, rooms);
+        let mut edges = triangulate(grid_dimensions, &mut rooms);
         assert_eq!(
-            result.edges.len(),
+            edges.len(),
             5,
             "There should be exactly 2 triangles and exactly 5 edges."
         );
 
         let mut actual_edges = [(0, 1), (0, 2), (1, 3), (2, 3), (0, 3)];
         actual_edges.sort();
-        result.edges.sort();
+        edges.sort();
 
         assert_eq!(
-            &result.edges, &actual_edges,
+            &edges, &actual_edges,
             "The result does not contain all the correct edges."
         );
     }
@@ -193,7 +184,7 @@ mod test {
     #[test]
     fn triangulation_many_vertices() {
         let grid_dimensions = vec2u(100, 100);
-        let rooms = Rooms {
+        let mut rooms = Dungeon {
             rooms: vec![],
             doorways: vec![
                 doorwayp(1, 1),
@@ -209,8 +200,8 @@ mod test {
             ],
         };
 
-        let mut result = triangulate(grid_dimensions, rooms);
-        result.edges.sort();
+        let mut edges = triangulate(grid_dimensions, &mut rooms);
+        edges.sort();
 
         let mut actual_edges = [
             (0, 1),
@@ -237,7 +228,7 @@ mod test {
         actual_edges.sort();
 
         assert_eq!(
-            &result.edges, &actual_edges,
+            &edges, &actual_edges,
             "The result does not contain all the correct edges."
         )
     }

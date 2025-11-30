@@ -9,8 +9,10 @@ dependencies are `CMake` and `clang` for the raylib crate. On Linux use your
 favourite package manager. On Windows follow the instructions on the websites of
 the tools.
 
+Refer to the testing documentation on how to produce code coverage.
+
 ## Executable
 
 As an alternative there are executables published as a release on the GitHub
-repository.
+repository. (As of now, they are outdated.)
 

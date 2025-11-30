@@ -1,12 +1,10 @@
 use crate::Configuration;
-use crate::a_star::a_star;
+use crate::a_star;
 use crate::binary_heap::Heap;
-use crate::room::RoomGraph;
-use crate::vec::to_index;
+use crate::room::{Dungeon, Edges};
+use crate::vec::{self, Vector2};
 
 use std::fmt::Write;
-
-use raylib::math::Vector2;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Tile {
@@ -131,7 +129,8 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
 #[allow(clippy::too_many_arguments)]
 fn try_place_corridors(
     configuration: &Configuration,
-    room_graph: &RoomGraph,
+    dungeon: &Dungeon,
+    corridors: &Edges,
     width: usize,
     tiles: &mut [Tile],
     open_set: &mut Heap<usize, usize>,
@@ -140,13 +139,13 @@ fn try_place_corridors(
     path: &mut Vec<usize>,
 ) -> bool {
     use Tile::*;
-    for edge in &room_graph.edges {
-        let position_a = to_index(room_graph.doorways[edge.0].position, width);
-        let position_b = to_index(room_graph.doorways[edge.1].position, width);
+    for edge in corridors {
+        let position_a = vec::to_index(dungeon.doorways[edge.0].position, width);
+        let position_b = vec::to_index(dungeon.doorways[edge.1].position, width);
         // Place doorways (which replace blocking tiles around the rooms) and create corridors.
         tiles[position_a] = Doorway;
         tiles[position_b] = Doorway;
-        a_star(
+        a_star::a_star(
             configuration,
             position_a,
             position_b,
@@ -168,10 +167,14 @@ fn try_place_corridors(
 /// Takes a room graph and creates the corresponding grid given the options in the configuration
 /// structure. Uses the A* algorithm to carve corridors between the rooms, while ensuring that no
 /// corridors make a 2x2 square (aesthetic choice).
+///
+/// If the corridor generation fails (which can happen if the configuration values for the
+/// different costs are more extreme) it regenerates the corridor with the default values.
 pub fn make_grid(
     configuration: &Configuration,
     grid_dimensions: Vector2,
-    room_graph: &RoomGraph,
+    dungeon: &Dungeon,
+    corridors: &Edges,
 ) -> Grid {
     use Tile::*;
 
@@ -194,10 +197,10 @@ pub fn make_grid(
     // perimeter of blocking tiles. Some of the blocking tiles will
     // be replaced by doorways in the following step. One can enter
     // a room only through a doorway.
-    for room in &room_graph.rooms {
-        let top_left_corner = room.bounds.x as usize + room.bounds.y as usize * grid_width;
-        let room_width = room.bounds.width as usize;
-        let room_height = room.bounds.height as usize;
+    for room in &dungeon.rooms {
+        let top_left_corner = room.bounds.x + room.bounds.y * grid_width;
+        let room_width = room.bounds.width;
+        let room_height = room.bounds.height;
         for row in 0..room_height {
             for column in 0..room_width {
                 tiles[top_left_corner + row * grid_width + column] = Room;
@@ -224,7 +227,8 @@ pub fn make_grid(
     let mut tiles_clone = tiles.clone();
     if try_place_corridors(
         configuration,
-        room_graph,
+        dungeon,
+        corridors,
         grid_width,
         &mut tiles_clone,
         &mut open_set,
@@ -239,7 +243,8 @@ pub fn make_grid(
     } else {
         try_place_corridors(
             &Default::default(),
-            room_graph,
+            dungeon,
+            corridors,
             grid_width,
             &mut tiles,
             &mut open_set,
@@ -373,7 +378,7 @@ mod test {
         // corridor placement already have been tested.
         let configuration = Configuration::default();
 
-        let room_graph = RoomGraph {
+        let dungeon = Dungeon {
             rooms: vec![
                 room(3, 3, 5, 5),
                 room(11, 3, 5, 5),
@@ -390,13 +395,13 @@ mod test {
                 doorway(13, 10, 0),
                 doorway(10, 13, 0),
             ],
-            edges: vec![(0, 2), (1, 4), (3, 6), (5, 7)],
         };
+        let corridors = vec![(0, 2), (1, 4), (3, 6), (5, 7)];
 
         let grid_dimension = configuration.min_padding * 3 + configuration.min_room_dimension * 2;
         let grid_dimensions = vec2u(grid_dimension, grid_dimension);
 
-        let grid = make_grid(&configuration, grid_dimensions, &room_graph);
+        let grid = make_grid(&configuration, grid_dimensions, &dungeon, &corridors);
         let correct_grid = Grid::from(
             "\
             %%%%%%%%%%%%%%%%%%%\n\

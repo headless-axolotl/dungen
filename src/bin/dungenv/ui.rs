@@ -2,8 +2,8 @@ use crate::{CONTROLS, MAX_MAP_DIMENSIONS, MAX_ROOM_COUNT};
 use crate::{Generator, Request};
 use dungen::Configuration;
 use dungen::grid::Grid;
-use dungen::room::RoomGraph;
-use dungen::vec::vec2u;
+use dungen::room::{Dungeon, Edges};
+use dungen::vec;
 
 pub type ExportResult = Result<(), &'static str>;
 
@@ -46,7 +46,8 @@ pub fn draw_ui(
     editing_text: &mut bool,
     grid: &Grid,
     generator: &Generator,
-    triangulation: &RoomGraph,
+    dungeon: &Dungeon,
+    triangulation: &Edges,
 ) {
     *editing_text = false;
     // ============================== User Interface
@@ -100,13 +101,15 @@ pub fn draw_ui(
 
 
             { // ============================== doorway_offset
+                let max_doorway_offset = (configuration.min_room_dimension >> 1)
+                    - ((!configuration.min_room_dimension) & 1);
                 configuration.doorway_offset = configuration
                     .doorway_offset
-                    .min(configuration.min_room_dimension >> 1);
+                    .min(max_doorway_offset);
                 ui.slider(
                     "Doorway offset",
                     1,
-                    configuration.min_room_dimension >> 1,
+                    max_doorway_offset,
                     &mut configuration.doorway_offset,
                 );
                 if ui.is_item_hovered() {
@@ -208,7 +211,7 @@ pub fn draw_ui(
                         "What percentage of rooms with the given minimum dimesions \
                          should have mazes generated in them.");
                 }
-            } // ============================== max_fail_count
+            } // ============================== maze options
 
             ui.label_text("Controls", CONTROLS);
 
@@ -248,7 +251,7 @@ pub fn draw_ui(
                 *generating = true;
                 if generator.requests.send(Request::New {
                     configuration: configuration.clone(),
-                    grid_dimensions: vec2u(*grid_width, *grid_height),
+                    grid_dimensions: vec::vec2u(*grid_width, *grid_height),
                     target_room_count: *target_room_count,
                 }).is_err() {
                     return;
@@ -259,7 +262,8 @@ pub fn draw_ui(
                 *generating = true;
                 if generator.requests.send(Request::Corridors {
                     configuration: configuration.clone(),
-                    grid_dimensions: vec2u(*grid_width, *grid_height),
+                    grid_dimensions: vec::vec2u(*grid_width, *grid_height),
+                    dungeon: dungeon.clone(),
                     triangulation: triangulation.clone()
                 }).is_err() {
                     return;

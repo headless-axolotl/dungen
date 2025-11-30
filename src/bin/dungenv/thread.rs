@@ -1,34 +1,35 @@
 use dungen::Configuration;
 use dungen::grid::Grid;
 use dungen::maze;
-use dungen::room::RoomGraph;
+use dungen::room::{Dungeon, Edges};
+use dungen::vec;
 
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::thread::JoinHandle;
 
-use raylib::math::Vector2;
-
 pub enum Request {
     New {
         configuration: Configuration,
-        grid_dimensions: Vector2,
+        grid_dimensions: vec::Vector2,
         target_room_count: usize,
     },
     Corridors {
         configuration: Configuration,
-        grid_dimensions: Vector2,
-        triangulation: RoomGraph,
+        grid_dimensions: vec::Vector2,
+        dungeon: Dungeon,
+        triangulation: Edges,
     },
 }
 
 pub enum Result {
     New {
-        triangulation: RoomGraph,
-        corridors: RoomGraph,
+        dungeon: Dungeon,
+        triangulation: Edges,
+        corridors: Edges,
         grid: Grid,
     },
     Corridors {
-        corridors: RoomGraph,
+        corridors: Edges,
         grid: Grid,
     },
 }
@@ -63,18 +64,20 @@ pub fn make_generator() -> Generator {
                     grid_dimensions,
                     target_room_count,
                 } => {
-                    let rooms = generate_rooms(
+                    let mut dungeon = generate_rooms(
                         &configuration,
                         grid_dimensions,
                         Some(target_room_count),
                         &mut rng,
                     );
-                    let triangulation = triangulate(grid_dimensions, rooms);
-                    let corridors = pick_corridors(&configuration, triangulation.clone(), &mut rng);
-                    let mut grid = make_grid(&configuration, grid_dimensions, &corridors);
-                    maze::make_mazes(&mut rng, &configuration, &mut grid, &corridors);
+                    let mut triangulation = triangulate(grid_dimensions, &mut dungeon);
+                    let corridors =
+                        pick_corridors(&configuration, &dungeon, &mut triangulation, &mut rng);
+                    let mut grid = make_grid(&configuration, grid_dimensions, &dungeon, &corridors);
+                    maze::make_mazes(&mut rng, &configuration, &mut grid, &dungeon);
                     if results_sender
                         .send(Result::New {
+                            dungeon,
                             triangulation,
                             corridors,
                             grid,
@@ -87,11 +90,13 @@ pub fn make_generator() -> Generator {
                 Request::Corridors {
                     configuration,
                     grid_dimensions,
-                    triangulation,
+                    dungeon: rooms,
+                    mut triangulation,
                 } => {
-                    let corridors = pick_corridors(&configuration, triangulation, &mut rng);
-                    let mut grid = make_grid(&configuration, grid_dimensions, &corridors);
-                    maze::make_mazes(&mut rng, &configuration, &mut grid, &corridors);
+                    let corridors =
+                        pick_corridors(&configuration, &rooms, &mut triangulation, &mut rng);
+                    let mut grid = make_grid(&configuration, grid_dimensions, &rooms, &corridors);
+                    maze::make_mazes(&mut rng, &configuration, &mut grid, &rooms);
                     if results_sender
                         .send(Result::Corridors { corridors, grid })
                         .is_err()

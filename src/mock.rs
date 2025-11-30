@@ -1,11 +1,10 @@
 use crate::room::{Doorway, Room};
-use crate::vec::vec2u;
-use raylib::math::Rectangle;
+use crate::vec::{Rectangle, vec2u};
 
 // Shorthands:
 pub fn room(x: usize, y: usize, w: usize, h: usize) -> Room {
     Room {
-        bounds: Rectangle::new(x as f32, y as f32, w as f32, h as f32),
+        bounds: Rectangle::new(x, y, w, h),
     }
 }
 pub fn doorway(x: usize, y: usize, room_index: usize) -> Doorway {

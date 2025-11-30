@@ -1,9 +1,7 @@
-use crate::vec::vec2;
+use crate::vec::{self, Rectangle, Vector2};
 use crate::{Configuration, rng::Rng};
 
 use std::ops::RangeInclusive;
-
-use raylib::math::{Rectangle, Vector2};
 
 const EAST: usize = 0;
 const NORTH: usize = 1;
@@ -28,28 +26,30 @@ impl From<Doorway> for Vector2 {
     }
 }
 
-#[derive(Debug)]
-pub struct Rooms {
+#[derive(Clone, Debug)]
+pub struct Dungeon {
     pub rooms: Vec<Room>,
     pub doorways: Vec<Doorway>,
 }
 
-#[derive(Clone, Debug)]
-pub struct RoomGraph {
-    pub rooms: Vec<Room>,
-    pub doorways: Vec<Doorway>,
-    pub edges: Vec<(usize, usize)>,
-}
+pub type Edges = Vec<(usize, usize)>;
+
+// #[derive(Clone, Debug)]
+// pub struct RoomGraph {
+//     pub rooms: Vec<Room>,
+//     pub doorways: Vec<Doorway>,
+//     pub edges: Vec<(usize, usize)>,
+// }
 
 /// Guarantees that there is at least min_padding cells distance between the two rectangles. We
 /// need only extend the rectangles down and to the right.
 pub fn overlap_with_padding(min_padding: usize, a: &Rectangle, b: &Rectangle) -> bool {
     let mut padded_a = *a;
-    padded_a.width += min_padding as f32;
-    padded_a.height += min_padding as f32;
+    padded_a.width += min_padding;
+    padded_a.height += min_padding;
     let mut padded_b = *b;
-    padded_b.width += min_padding as f32;
-    padded_b.height += min_padding as f32;
+    padded_b.width += min_padding;
+    padded_b.height += min_padding;
     padded_a.check_collision_recs(&padded_b)
 }
 
@@ -63,39 +63,36 @@ pub fn generate_doorways<R: Rng>(
 ) {
     // Generate a random number representing which doorways exist.
     let doorway_mask = rng.random_range(1..=15);
-    let corner = vec2(room.bounds.x, room.bounds.y);
+    let corner = vec::vec2u(room.bounds.x, room.bounds.y);
 
-    let vertical_range = doorway_offset..=room.bounds.height as usize - doorway_offset - 1;
-    let horizontal_range = doorway_offset..=room.bounds.width as usize - doorway_offset - 1;
+    let vertical_range = doorway_offset..=room.bounds.height - doorway_offset - 1;
+    let horizontal_range = doorway_offset..=room.bounds.width - doorway_offset - 1;
 
     if doorway_mask & (1 << EAST) != 0 {
         doorways.push(Doorway {
             room_index,
             position: corner
-                + vec2(
-                    room.bounds.width,
-                    rng.random_range(vertical_range.clone()) as f32,
-                ),
+                + vec::vec2u(room.bounds.width, rng.random_range(vertical_range.clone())),
         });
     }
     if doorway_mask & (1 << NORTH) != 0 {
         doorways.push(Doorway {
             room_index,
-            position: corner + vec2(rng.random_range(horizontal_range.clone()) as f32, -1.0),
+            position: corner + vec::vec2(rng.random_range(horizontal_range.clone()) as i32, -1),
         });
     }
     if doorway_mask & (1 << WEST) != 0 {
         doorways.push(Doorway {
             room_index,
-            position: corner + vec2(-1.0, rng.random_range(vertical_range.clone()) as f32),
+            position: corner + vec::vec2(-1, rng.random_range(vertical_range.clone()) as i32),
         });
     }
     if doorway_mask & (1 << SOUTH) != 0 {
         doorways.push(Doorway {
             room_index,
             position: corner
-                + vec2(
-                    rng.random_range(horizontal_range.clone()) as f32,
+                + vec::vec2u(
+                    rng.random_range(horizontal_range.clone()),
                     room.bounds.height,
                 ),
         });
@@ -110,8 +107,8 @@ pub fn generate_rooms<R: Rng>(
     grid_dimensions: Vector2,
     target_room_count: Option<usize>,
     rng: &mut R,
-) -> Rooms {
-    let mut result: Rooms = Rooms {
+) -> Dungeon {
+    let mut result: Dungeon = Dungeon {
         rooms: vec![],
         doorways: vec![],
     };
@@ -154,7 +151,7 @@ pub fn generate_rooms<R: Rng>(
         width = rng.random_range(width_range);
         height = rng.random_range(height_range);
 
-        rectangle = Rectangle::new(x as f32, y as f32, width as f32, height as f32);
+        rectangle = Rectangle::new(x, y, width, height);
 
         for previous_room in &result.rooms {
             if overlap_with_padding(min_padding, &previous_room.bounds, &rectangle) {
@@ -186,13 +183,12 @@ pub fn generate_rooms<R: Rng>(
 mod test {
     use super::*;
     use crate::{mock::*, vec::vec2u};
-    use raylib::math::Rectangle;
 
     #[test]
     fn overlap() {
-        let rect_a = Rectangle::new(0.0, 0.0, 5.0, 5.0);
-        let rect_b = Rectangle::new(8.0, 3.0, 5.0, 5.0);
-        let rect_c = Rectangle::new(7.0, 5.0, 5.0, 5.0);
+        let rect_a = Rectangle::new(0, 0, 5, 5);
+        let rect_b = Rectangle::new(8, 3, 5, 5);
+        let rect_c = Rectangle::new(7, 5, 5, 5);
 
         assert!(
             !overlap_with_padding(3, &rect_a, &rect_b),
@@ -219,20 +215,20 @@ mod test {
     fn doorway_generation_variant(mut rng: impl Rng, doorway_count: usize) {
         let doorway_offset = 2;
         let mut doorways: Vec<Doorway> = vec![];
-        let rectangle = Rectangle::new(1.0, 1.0, 5.0, 5.0);
+        let rectangle = Rectangle::new(1, 1, 5, 5);
         let outline = Rectangle::new(
-            rectangle.x - 1.0,
-            rectangle.y - 1.0,
-            rectangle.width + 2.0,
-            rectangle.height + 2.0,
+            rectangle.x - 1,
+            rectangle.y - 1,
+            rectangle.width + 2,
+            rectangle.height + 2,
         );
         let corners = [
-            vec2(outline.x, outline.y),
-            vec2(outline.x, outline.y + outline.height - 1.0),
-            vec2(outline.x + outline.width - 1.0, outline.y),
-            vec2(
-                outline.x + outline.width - 1.0,
-                outline.y + outline.height - 1.0,
+            vec2u(outline.x, outline.y),
+            vec2u(outline.x, outline.y + outline.height - 1),
+            vec2u(outline.x + outline.width - 1, outline.y),
+            vec2u(
+                outline.x + outline.width - 1,
+                outline.y + outline.height - 1,
             ),
         ];
 

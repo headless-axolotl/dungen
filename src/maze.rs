@@ -1,7 +1,7 @@
 use crate::Configuration;
 use crate::grid::{Grid, Tile};
 use crate::mst::DisjointSet;
-use crate::room::{Room, RoomGraph};
+use crate::room::{Dungeon, Room};
 use crate::vec;
 
 use rand::Rng;
@@ -12,9 +12,9 @@ use rand::seq::SliceRandom;
 /// [this article](https://en.wikipedia.org/wiki/Maze_generation_algorithm#Iterative_randomized_Kruskal's_algorithm_(with_sets)).
 #[cfg(not(tarpaulin_include))]
 pub fn place_maze<R: Rng>(rng: &mut R, room: &Room, grid: &mut Grid) {
-    let northwest_corner = vec::to_index(vec::vec2(room.bounds.x, room.bounds.y), grid.width);
-    let room_width = room.bounds.width as usize;
-    let room_height = room.bounds.height as usize;
+    let northwest_corner = vec::to_index(vec::vec2u(room.bounds.x, room.bounds.y), grid.width);
+    let room_width = room.bounds.width;
+    let room_height = room.bounds.height;
 
     // The maze generation algorithm works with 2x2 tiless. To cover the whole room we need the
     // following maze dimensions.
@@ -121,13 +121,13 @@ pub fn make_mazes<R: Rng>(
     rng: &mut R,
     configuration: &Configuration,
     grid: &mut Grid,
-    room_graph: &RoomGraph,
+    room_graph: &Dungeon,
 ) {
     let uniform = rand::distr::Uniform::new(0.0, 1.0).expect("Uniform range should be ok.");
 
     for room in &room_graph.rooms {
-        if room.bounds.width as usize >= configuration.min_maze_dimension
-            && room.bounds.height as usize >= configuration.min_maze_dimension
+        if room.bounds.width >= configuration.min_maze_dimension
+            && room.bounds.height >= configuration.min_maze_dimension
             && uniform.sample(rng) < configuration.maze_chance
         {
             place_maze(rng, room, grid);

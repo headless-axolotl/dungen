@@ -6,15 +6,15 @@ pub struct Heap<K, T> {
 
 impl<K, T> Heap<K, T>
 where
-    K: Default + Clone + Copy + PartialOrd + Ord + PartialEq + Eq,
-    T: Default + Clone + Copy,
+    K: Default + Copy + Ord + Eq,
+    T: Default + Copy,
 {
     /// Inserts a dummy element, because the calculations of the indices of a 1-based binary heap
     /// are easier. Since the number of elements in the graph is usually known, a facility to
     /// preallocate the needed number of slots in the arrays is provided.
     pub fn with_capacity(capacity: usize) -> Self {
-        let mut keys = Vec::with_capacity(capacity);
-        let mut aux = Vec::with_capacity(capacity);
+        let mut keys = Vec::with_capacity(capacity + 1);
+        let mut aux = Vec::with_capacity(capacity + 1);
 
         keys.push(K::default());
         aux.push(T::default());
