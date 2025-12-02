@@ -133,6 +133,8 @@ not be inserted in the priority queue.
 More extreme cost values sometimes make the pathfinding algorithm fail. In that
 case we regenerate the corridors with default cost settings.
 
+There is now an option which allows 2x2 squares of corridors to form.
+
 ### Maze generation
 
 In this step we attempt to generate a maze using a Spanning Tree method as
@@ -160,6 +162,12 @@ Wikipedia algorithm
 It should be possible to modify the behaviour of the pathfinding algorithm and
 the placement of marker tiles so as to allow for two corridors to run in
 parallel two tiles away and still be able to cross them perpendicularly.
+
+- More maze generation algorithms:
+    - Randomized DFS
+    - Cellular Automata
+- Upscaling the grid.
+- Erosion of walls.
 
 ## Source
 

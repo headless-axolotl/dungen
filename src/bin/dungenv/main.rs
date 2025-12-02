@@ -178,7 +178,7 @@ fn main() {
     } else {
         return;
     };
-    let highlight_special = false;
+    let mut highlight_special = false;
     rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
         draw_grid(&grid, &mut handle, highlight_special);
     });
@@ -210,6 +210,8 @@ fn main() {
 
     'main_thread: while !rl.window_should_close() {
         let ui = gui.begin(&mut rl);
+
+        let previous_highlight_special = highlight_special;
         ui::draw_ui(
             ui,
             &mut configuration,
@@ -223,6 +225,7 @@ fn main() {
             &mut export_path,
             &mut export_result,
             &mut editing_text,
+            &mut highlight_special,
             &grid,
             &generator,
             &rooms,
@@ -338,11 +341,16 @@ fn main() {
         }
 
         // ============================== Drawing
-        let mut draw_handle = rl.begin_drawing(&thread);
+        use ui::DrawOption::*;
+        if previous_highlight_special != highlight_special {
+            rl.draw_texture_mode(&thread, &mut render_texture, |mut handle| {
+                draw_grid(&grid, &mut handle, highlight_special);
+            });
+        }
 
+        let mut draw_handle = rl.begin_drawing(&thread);
         draw_handle.clear_background(Color::BLACK);
 
-        use ui::DrawOption::*;
         match draw_option {
             Grid => {
                 let destination_rectangle = Rectangle::new(

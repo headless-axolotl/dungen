@@ -24,12 +24,8 @@ triangulation. A* will be used to create the corridors between the rooms. The
 priority queue in A* will be binary heap.
 
 List of possible features that may be added to the dungeon after generation:
-- Mazes in parts of rooms which are sufficiently large.
-    - Randomized DFS
-    - Iterative randomized Kruskal
-    - Cellular Automata
-- Upscaling the grid.
-- Erosion of walls.
+- Mazes in parts of rooms which are of a given size through iterative randomized
+Kruskal.
 
 # Course info
 

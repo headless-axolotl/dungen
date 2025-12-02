@@ -86,6 +86,11 @@ pub fn place_maze<R: Rng>(rng: &mut R, room: &Room, grid: &mut Grid) {
         }
     }
 
+    // +--+--+
+    // |nw|ne|
+    // +--+--+
+    // |sw|se|
+    // +--+--+
     let mut nw_maze_subtile;
     let mut ne_maze_subtile;
     let mut sw_maze_subtile;
@@ -128,6 +133,8 @@ pub fn make_mazes<R: Rng>(
     for room in &room_graph.rooms {
         if room.bounds.width >= configuration.min_maze_dimension
             && room.bounds.height >= configuration.min_maze_dimension
+            && room.bounds.width <= configuration.max_maze_dimension
+            && room.bounds.height <= configuration.max_maze_dimension
             && uniform.sample(rng) < configuration.maze_chance
         {
             place_maze(rng, room, grid);

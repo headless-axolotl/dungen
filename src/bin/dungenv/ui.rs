@@ -7,6 +7,7 @@ use dungen::vec;
 
 pub type ExportResult = Result<(), &'static str>;
 
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DrawOption {
     Grid,
     Corridors,
@@ -44,6 +45,7 @@ pub fn draw_ui(
     export_path: &mut String,
     export_result: &mut ExportResult,
     editing_text: &mut bool,
+    highlight_special: &mut bool,
     grid: &Grid,
     generator: &Generator,
     dungeon: &Dungeon,
@@ -139,6 +141,11 @@ pub fn draw_ui(
             ui.spacing();
 
             { // ============================== corridor costs
+                ui.checkbox("Disallow Corridor Squares", &mut configuration.disallow_corridor_squares);
+                if ui.is_item_hovered() {
+                    ui.tooltip_text(
+                        "Whether the corridors can make a 2x2 square.");
+                }
                 ui.slider("Corridor Cost", 1, 40, &mut configuration.corridor_cost);
                 if ui.is_item_hovered() {
                     ui.tooltip_text(
@@ -194,11 +201,20 @@ pub fn draw_ui(
                 configuration.min_maze_dimension = configuration.min_maze_dimension
                     .max(configuration.min_room_dimension)
                     .min(configuration.max_room_dimension);
+                configuration.max_maze_dimension = configuration.max_maze_dimension
+                    .max(configuration.min_maze_dimension)
+                    .min(configuration.max_room_dimension);
                 ui.slider(
                     "Min Maze Dimensions",
                     configuration.min_room_dimension,
                     configuration.max_room_dimension,
                     &mut configuration.min_maze_dimension
+                );
+                ui.slider(
+                    "Max Maze Dimensions",
+                    configuration.min_maze_dimension,
+                    configuration.max_room_dimension,
+                    &mut configuration.max_maze_dimension
                 );
                 ui.slider(
                     "Maze Chance",
@@ -217,7 +233,7 @@ pub fn draw_ui(
 
             let token = ui.begin_disabled(*generating);
 
-            // ============================== Exporting
+            // ============================== exporting
             ui.columns(2, "Exporting", false);
             ui.input_text("Export path", export_path).build();
             if ui.is_item_active() || ui.is_item_edited() {
@@ -245,8 +261,10 @@ pub fn draw_ui(
                     ui.close_current_popup();
                 }
             }
-            // ============================== Exporting
+            // ============================== exporting
 
+            // ============================== generation
+            ui.columns(2, "Generation", false);
             if ui.button("Regenerate") {
                 *generating = true;
                 if generator.requests.send(Request::New {
@@ -258,9 +276,10 @@ pub fn draw_ui(
                 };
             }
 
-            if ui.button("Regenerate Corridors") {
+            ui.next_column();
+            if ui.button("Regenerate Extras") {
                 *generating = true;
-                if generator.requests.send(Request::Corridors {
+                if generator.requests.send(Request::CorridorsAndMazes {
                     configuration: configuration.clone(),
                     grid_dimensions: vec::vec2u(*grid_width, *grid_height),
                     dungeon: dungeon.clone(),
@@ -269,12 +288,21 @@ pub fn draw_ui(
                     return;
                 };
             }
+            ui.columns(1, "", false);
             token.end();
+            // ============================== generation
 
+            // ============================== View options
             use DrawOption::*;
-            ui.columns(3, "Views", false);
+            ui.columns(4, "Views", false);
             if ui.button("Grid") {
                 *draw_option = Grid;
+                *highlight_special = false;
+            }
+            ui.next_column();
+            if ui.button("Grid+") {
+                *draw_option = Grid;
+                *highlight_special = true;
             }
             ui.next_column();
             if ui.button("Corridors") {
@@ -286,6 +314,7 @@ pub fn draw_ui(
             }
             ui.next_column();
             ui.columns(1, "", false);
+            // ============================== View options
         });
     // ============================== User Interface
 }

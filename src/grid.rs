@@ -94,7 +94,7 @@ impl From<&str> for Grid {
 /// so that the search algorithm knows to avoid creating 2x2 corridor tile blocks.
 /// When there is a turn in the corridor, places a blocking tile again to prevent
 /// the pathfinding algorithm from creating 2x2 corridor tile blocks.
-fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
+fn place_corridor(disallow_corridor_squares: bool, width: usize, tiles: &mut [Tile], path: &[usize]) {
     use Tile::*;
 
     #[inline]
@@ -105,15 +105,22 @@ fn place_corridor(width: usize, tiles: &mut [Tile], path: &[usize]) {
         } else if matches!(tiles[index], Wall) {
             tiles[index] = CorridorNeighbor;
         } else if matches!(tiles[index], Room) {
-            // Place a doorway marker tile inside the room to help the maze generation algorithm
-            // procedure.
+            // Place a doorway marker tile inside the room to help the maze generation procedure.
             tiles[index] = Doorway;
         }
     }
 
-    // The first and the last tiles in the path are doorways.
+    // The first and the last tiles in the path are doorways and we want to always mark the for the
+    // maze generation procedure.
+    for &current in &[path[0], path[path.len() - 1]] {
+        place_corridor_neighbor(current + 1, tiles);
+        place_corridor_neighbor(current - 1, tiles);
+        place_corridor_neighbor(current + width, tiles);
+        place_corridor_neighbor(current - width, tiles);
+    }
+
     for &current in path {
-        if !matches!(tiles[current], Corridor) {
+        if disallow_corridor_squares && !matches!(tiles[current], Corridor) {
             place_corridor_neighbor(current + 1, tiles);
             place_corridor_neighbor(current - 1, tiles);
             place_corridor_neighbor(current + width, tiles);
@@ -159,7 +166,7 @@ fn try_place_corridors(
         if path.is_empty() {
             return false;
         }
-        place_corridor(width, tiles, path);
+        place_corridor(configuration.disallow_corridor_squares, width, tiles, path);
     }
     true
 }
@@ -353,7 +360,7 @@ mod test {
             to_index(vec2u(10, 4), width),
         ];
 
-        place_corridor(width, &mut tiles, path);
+        place_corridor(true, width, &mut tiles, path);
 
         let correct_grid = Grid::from(
             "\

@@ -13,7 +13,7 @@ pub enum Request {
         grid_dimensions: vec::Vector2,
         target_room_count: usize,
     },
-    Corridors {
+    CorridorsAndMazes {
         configuration: Configuration,
         grid_dimensions: vec::Vector2,
         dungeon: Dungeon,
@@ -87,7 +87,7 @@ pub fn make_generator() -> Generator {
                         break;
                     }
                 }
-                Request::Corridors {
+                Request::CorridorsAndMazes {
                     configuration,
                     grid_dimensions,
                     dungeon: rooms,

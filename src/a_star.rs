@@ -12,6 +12,7 @@ fn manhattan(width: usize, a: usize, b: usize) -> usize {
     diff(a / width, b / width) + diff(a % width, b % width)
 }
 
+/// Answers whether the four given nodes create a 2x2 square.
 fn make_square(width: usize, mut nodes: [usize; 4]) -> bool {
     nodes.sort();
     nodes[0] + 1 == nodes[1] && nodes[0] + width == nodes[2] && nodes[0] + width + 1 == nodes[3]
@@ -38,6 +39,7 @@ pub fn a_star(
 ) {
     use Tile::*;
 
+    let disallow_corridor_squares = configuration.disallow_corridor_squares;
     let corridor_cost = configuration.corridor_cost;
     let straight_cost = configuration.straight_cost;
     let standard_cost = configuration.standard_cost;
@@ -83,20 +85,22 @@ pub fn a_star(
             if matches!(tiles[neighbor], Blocker | Room) {
                 continue;
             }
-            // We cannot go to another corridor neighbor if we also are a corridor neighbor. This
-            // covers one of the cases where the corridor would make a 2x2 square which is one of
-            // the rules the corridors must follow.
-            if matches!(tiles[current], CorridorNeighbor)
-                && matches!(tiles[neighbor], CorridorNeighbor)
-            {
-                continue;
-            }
-            // If the path makes a square, this is an invalid neighbor.
-            if make_square(
-                width,
-                [neighbor, current, parent[current], parent[parent[current]]],
-            ) {
-                continue;
+            if disallow_corridor_squares {
+                // We cannot go to another corridor neighbor if we also are a corridor neighbor. This
+                // covers one of the cases where the corridor would make a 2x2 square which is one of
+                // the rules the corridors must follow.
+                if matches!(tiles[current], CorridorNeighbor)
+                    && matches!(tiles[neighbor], CorridorNeighbor)
+                {
+                    continue;
+                }
+                // If the path makes a square, this is an invalid neighbor.
+                if make_square(
+                    width,
+                    [neighbor, current, parent[current], parent[parent[current]]],
+                ) {
+                    continue;
+                }
             }
 
             let cost = if matches!(tiles[neighbor], Corridor) {

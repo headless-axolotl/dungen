@@ -30,6 +30,8 @@ pub struct Configuration {
     /// What proportion of edges on average should be reintroduced as corridors i.e. (0) out of
     /// every (1).
     pub reintroduced_corridor_density: (usize, usize),
+    /// Whether the corridors are allowed to make 2x2 squares.
+    pub disallow_corridor_squares: bool,
     /// Cost for the A* algorithm when we go through an already placed corridor. The relationship
     /// between this value and the other two costs determines the shape of the corridors.
     pub corridor_cost: usize,
@@ -39,7 +41,11 @@ pub struct Configuration {
     pub straight_cost: usize,
     /// Default cost for the A* algorithm. The corridors can move only horizontally or vertically.
     pub standard_cost: usize,
+    /// The minimum room dimensions required for a room to be considered for maze generation.
     pub min_maze_dimension: usize,
+    /// The maximum room dimensions required for a room to be considered for maze generation.
+    pub max_maze_dimension: usize,
+    /// What proportion of legal rooms should have mazes in them.
     pub maze_chance: f32,
 }
 
@@ -55,6 +61,7 @@ impl Configuration {
             && self.straight_cost >= 1
             && self.standard_cost >= 1
             && self.min_maze_dimension >= 5
+            && self.min_room_dimension <= self.min_maze_dimension
             && 0.0 <= self.maze_chance
             && self.maze_chance <= 1.0
     }
@@ -69,10 +76,12 @@ impl Default for Configuration {
             doorway_offset: 2,
             max_fail_count: 10,
             reintroduced_corridor_density: (1, 2),
+            disallow_corridor_squares: true,
             corridor_cost: 1,
             straight_cost: 2,
             standard_cost: 3,
             min_maze_dimension: 5,
+            max_maze_dimension: 20,
             maze_chance: 0.1,
         }
     }
