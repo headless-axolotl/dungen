@@ -23,11 +23,16 @@ impl DisjointSet {
     /// Climb up the tree until the parent is found. On the way back reparent all the nodes in the
     /// path to the parent, reducing the time for the next query.
     pub fn find_set(&mut self, entity: usize) -> usize {
-        if self.parent[entity] == entity {
-            return entity;
+        let mut root = entity;
+        while root != self.parent[root] {
+            root = self.parent[root];
         }
-        self.parent[entity] = self.find_set(self.parent[entity]);
-        self.parent[entity]
+        let mut ancestor = entity;
+        while ancestor != self.parent[ancestor] {
+            ancestor = self.parent[ancestor];
+            self.parent[ancestor] = root;
+        }
+        root
     }
 
     /// Merge the two sets based on their rank (depth of the corresponding tree).
